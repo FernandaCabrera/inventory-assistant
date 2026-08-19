@@ -35,6 +35,20 @@ const COLORS = {
   excessBg: "#E4E9F2",
 };
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 760 : false
+  );
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 760);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  return isMobile;
+}
+
 function useGoogleFonts() {
   useEffect(() => {
     if (document.getElementById("ia-fonts")) return;
@@ -165,6 +179,7 @@ function ChartCard({ title, children, height = 280 }) {
 }
 
 function Dashboard() {
+  const isMobile = useIsMobile();
   const statusCounts = { critical: 0, low: 0, ok: 0, excess: 0 };
   inventory.forEach((item) => {
     statusCounts[statusFor(item)] += 1;
@@ -207,7 +222,7 @@ function Dashboard() {
         <KPICard label="Total Units" value={totalUnits.toLocaleString()} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <ChartCard title="SKUs by Status">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={statusData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
@@ -358,6 +373,7 @@ const FULL_REPORT_PROMPT =
 
 export default function InventoryAssistant() {
   useGoogleFonts();
+  const isMobile = useIsMobile();
   const warehouseCount = new Set(inventory.map((i) => i.warehouse)).size;
   const [messages, setMessages] = useState([
     {
@@ -573,19 +589,10 @@ export default function InventoryAssistant() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: COLORS.bg, minHeight: "100vh", padding: "36px 20px" }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" }}>
       <style>{`
         @keyframes ia-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .ia-spin { animation: ia-spin 0.8s linear infinite; }
-
-        @media (max-width: 760px) {
-          .ia-container { padding: 20px 14px !important; }
-          .ia-title { font-size: 24px !important; }
-          .ia-main-grid { grid-template-columns: 1fr !important; }
-          .ia-dashboard-grid { grid-template-columns: 1fr !important; }
-          .ia-chat-panel { height: 62vh !important; }
-          .ia-sidebar-panel { height: 340px !important; }
-        }
       `}</style>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {/* Header */}
@@ -605,7 +612,7 @@ export default function InventoryAssistant() {
         <h1
           style={{
             fontFamily: "'Oswald', sans-serif",
-            fontSize: 34,
+            fontSize: isMobile ? 24 : 34,
             fontWeight: 600,
             color: COLORS.ink,
             margin: 0,
@@ -753,7 +760,7 @@ export default function InventoryAssistant() {
         {view === "dashboard" ? (
           <Dashboard />
         ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 20 }}>
           {/* Chat panel */}
           <div
             style={{
@@ -762,7 +769,7 @@ export default function InventoryAssistant() {
               borderRadius: 12,
               display: "flex",
               flexDirection: "column",
-              height: 560,
+              height: isMobile ? 480 : 560,
             }}
           >
             <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 20px 4px" }}>
@@ -876,7 +883,7 @@ export default function InventoryAssistant() {
               border: `1px solid ${COLORS.line}`,
               borderRadius: 12,
               padding: 18,
-              height: 560,
+              height: isMobile ? 340 : 560,
               overflowY: "auto",
             }}
           >
