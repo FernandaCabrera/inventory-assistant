@@ -577,6 +577,15 @@ export default function InventoryAssistant() {
       <style>{`
         @keyframes ia-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .ia-spin { animation: ia-spin 0.8s linear infinite; }
+
+        @media (max-width: 760px) {
+          .ia-container { padding: 20px 14px !important; }
+          .ia-title { font-size: 24px !important; }
+          .ia-main-grid { grid-template-columns: 1fr !important; }
+          .ia-dashboard-grid { grid-template-columns: 1fr !important; }
+          .ia-chat-panel { height: 62vh !important; }
+          .ia-sidebar-panel { height: 340px !important; }
+        }
       `}</style>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {/* Header */}
