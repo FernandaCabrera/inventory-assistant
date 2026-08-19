@@ -16,6 +16,8 @@ import {
   Legend,
 } from "recharts";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4001";
+
 const COLORS = {
   bg: "#EEF1EC",
   surface: "#FFFFFF",
@@ -390,7 +392,7 @@ export default function InventoryAssistant() {
   async function toggleShowPrompt() {
     if (!showPrompt && !systemPrompt) {
       try {
-        const res = await fetch("http://localhost:4001/api/system-prompt");
+        const res = await fetch(`${API_URL}/api/system-prompt`);
         const data = await res.json();
         setSystemPrompt(data.prompt);
       } catch (err) {
@@ -550,7 +552,7 @@ export default function InventoryAssistant() {
         .slice(-6)
         .map((m) => ({ role: m.role, text: m.text }));
 
-      const res = await fetch("http://localhost:4001/api/ask", {
+      const res = await fetch(`${API_URL}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, inventory, history: historyForApi }),
