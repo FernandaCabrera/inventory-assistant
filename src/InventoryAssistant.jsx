@@ -938,7 +938,7 @@ export default function InventoryAssistant() {
               )}
             </div>
 
-            {!typing && (
+            {messages.length <= 1 && (
             <div style={{ padding: "10px 20px 0", display: "flex", flexWrap: "wrap", gap: 7, borderTop: `1px solid ${COLORS.line}`, paddingTop: 14 }}>
               {QUICK_PROMPTS.map((q) => (
                 <button
