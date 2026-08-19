@@ -1,0 +1,416 @@
+[
+  {
+    "sku": "FF-1006",
+    "name": "Frozen chicken breast (5kg case)",
+    "warehouse": "Surrey Plant",
+    "stock": 4,
+    "reorder_point": 22,
+    "lead_time_days": 3,
+    "avg_daily_usage": 6
+  },
+  {
+    "sku": "FF-1013",
+    "name": "Frozen ground beef (10kg case)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 14,
+    "reorder_point": 63,
+    "lead_time_days": 4,
+    "avg_daily_usage": 12
+  },
+  {
+    "sku": "FF-1019",
+    "name": "Frozen salmon fillets (3kg case)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 72,
+    "reorder_point": 36,
+    "lead_time_days": 3,
+    "avg_daily_usage": 10
+  },
+  {
+    "sku": "FF-1023",
+    "name": "Frozen mixed vegetables (10kg bag)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 14,
+    "reorder_point": 21,
+    "lead_time_days": 7,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1031",
+    "name": "Frozen broccoli florets (8kg bag)",
+    "warehouse": "Burnaby DC",
+    "stock": 81,
+    "reorder_point": 48,
+    "lead_time_days": 6,
+    "avg_daily_usage": 7
+  },
+  {
+    "sku": "FF-1038",
+    "name": "Frozen sweet potato fries (6kg bag)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 58,
+    "reorder_point": 21,
+    "lead_time_days": 7,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1046",
+    "name": "Whey protein powder (bulk 25kg)",
+    "warehouse": "Surrey Plant",
+    "stock": 325,
+    "reorder_point": 127,
+    "lead_time_days": 14,
+    "avg_daily_usage": 6
+  },
+  {
+    "sku": "FF-1054",
+    "name": "Plant-based protein powder (bulk 20kg)",
+    "warehouse": "Burnaby DC",
+    "stock": 31,
+    "reorder_point": 11,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1058",
+    "name": "Almond flour (15kg bag)",
+    "warehouse": "Surrey Plant",
+    "stock": 107,
+    "reorder_point": 80,
+    "lead_time_days": 10,
+    "avg_daily_usage": 6
+  },
+  {
+    "sku": "FF-1066",
+    "name": "Coconut oil (20L drum)",
+    "warehouse": "Burnaby DC",
+    "stock": 202,
+    "reorder_point": 150,
+    "lead_time_days": 7,
+    "avg_daily_usage": 15
+  },
+  {
+    "sku": "FF-1076",
+    "name": "Olive oil (20L drum)",
+    "warehouse": "Burnaby DC",
+    "stock": 308,
+    "reorder_point": 58,
+    "lead_time_days": 5,
+    "avg_daily_usage": 9
+  },
+  {
+    "sku": "FF-1082",
+    "name": "Brown rice (25kg bag)",
+    "warehouse": "Burnaby DC",
+    "stock": 5,
+    "reorder_point": 19,
+    "lead_time_days": 8,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1087",
+    "name": "Quinoa (20kg bag)",
+    "warehouse": "Surrey Plant",
+    "stock": 88,
+    "reorder_point": 111,
+    "lead_time_days": 6,
+    "avg_daily_usage": 12
+  },
+  {
+    "sku": "FF-1095",
+    "name": "Vacuum-seal packaging film (roll)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 70,
+    "reorder_point": 35,
+    "lead_time_days": 5,
+    "avg_daily_usage": 6
+  },
+  {
+    "sku": "FF-1104",
+    "name": "Meal prep containers (case of 150)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 148,
+    "reorder_point": 156,
+    "lead_time_days": 10,
+    "avg_daily_usage": 12
+  },
+  {
+    "sku": "FF-1110",
+    "name": "Nutrition label rolls (roll of 5000)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 7,
+    "reorder_point": 12,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1118",
+    "name": "Shipping boxes (medium) (bundle of 50)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 203,
+    "reorder_point": 41,
+    "lead_time_days": 4,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1124",
+    "name": "Insulated shipping liners (bundle of 25)",
+    "warehouse": "Surrey Plant",
+    "stock": 223,
+    "reorder_point": 93,
+    "lead_time_days": 4,
+    "avg_daily_usage": 15
+  },
+  {
+    "sku": "FF-1129",
+    "name": "Ice packs (reusable) (case of 200)",
+    "warehouse": "Surrey Plant",
+    "stock": 24,
+    "reorder_point": 66,
+    "lead_time_days": 7,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1139",
+    "name": "Sea salt (10kg bag)",
+    "warehouse": "Richmond DC",
+    "stock": 26,
+    "reorder_point": 76,
+    "lead_time_days": 14,
+    "avg_daily_usage": 4
+  },
+  {
+    "sku": "FF-1146",
+    "name": "Black pepper (5kg bag)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 29,
+    "reorder_point": 31,
+    "lead_time_days": 6,
+    "avg_daily_usage": 4
+  },
+  {
+    "sku": "FF-1152",
+    "name": "Garlic powder (8kg bag)",
+    "warehouse": "Surrey Plant",
+    "stock": 488,
+    "reorder_point": 80,
+    "lead_time_days": 8,
+    "avg_daily_usage": 9
+  },
+  {
+    "sku": "FF-1157",
+    "name": "Paprika (5kg bag)",
+    "warehouse": "Burnaby DC",
+    "stock": 80,
+    "reorder_point": 23,
+    "lead_time_days": 3,
+    "avg_daily_usage": 5
+  },
+  {
+    "sku": "FF-1165",
+    "name": "Cumin (5kg bag)",
+    "warehouse": "Surrey Plant",
+    "stock": 131,
+    "reorder_point": 65,
+    "lead_time_days": 14,
+    "avg_daily_usage": 4
+  },
+  {
+    "sku": "FF-1171",
+    "name": "Soy sauce (20L drum)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 176,
+    "reorder_point": 78,
+    "lead_time_days": 10,
+    "avg_daily_usage": 5
+  },
+  {
+    "sku": "FF-1181",
+    "name": "Teriyaki sauce base (20L drum)",
+    "warehouse": "Richmond DC",
+    "stock": 419,
+    "reorder_point": 214,
+    "lead_time_days": 10,
+    "avg_daily_usage": 15
+  },
+  {
+    "sku": "FF-1183",
+    "name": "Tomato sauce base (25L drum)",
+    "warehouse": "Burnaby DC",
+    "stock": 33,
+    "reorder_point": 23,
+    "lead_time_days": 6,
+    "avg_daily_usage": 3
+  },
+  {
+    "sku": "FF-1191",
+    "name": "BBQ sauce base (20L drum)",
+    "warehouse": "Surrey Plant",
+    "stock": 11,
+    "reorder_point": 68,
+    "lead_time_days": 4,
+    "avg_daily_usage": 15
+  },
+  {
+    "sku": "FF-1199",
+    "name": "Frozen edamame (8kg bag)",
+    "warehouse": "Surrey Plant",
+    "stock": 173,
+    "reorder_point": 87,
+    "lead_time_days": 14,
+    "avg_daily_usage": 5
+  },
+  {
+    "sku": "FF-1209",
+    "name": "Frozen cauliflower rice (10kg bag)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 124,
+    "reorder_point": 90,
+    "lead_time_days": 12,
+    "avg_daily_usage": 5
+  },
+  {
+    "sku": "FF-1211",
+    "name": "Frozen shrimp (5kg case)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 284,
+    "reorder_point": 84,
+    "lead_time_days": 8,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1223",
+    "name": "Tofu blocks (case of 24)",
+    "warehouse": "Surrey Plant",
+    "stock": 43,
+    "reorder_point": 35,
+    "lead_time_days": 3,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1226",
+    "name": "Tempeh blocks (case of 24)",
+    "warehouse": "Burnaby DC",
+    "stock": 104,
+    "reorder_point": 147,
+    "lead_time_days": 14,
+    "avg_daily_usage": 9
+  },
+  {
+    "sku": "FF-1232",
+    "name": "Egg whites (liquid) (20L drum)",
+    "warehouse": "Delta Cold Storage",
+    "stock": 280,
+    "reorder_point": 47,
+    "lead_time_days": 14,
+    "avg_daily_usage": 3
+  },
+  {
+    "sku": "FF-1239",
+    "name": "Greek yogurt (bulk) (20kg tub)",
+    "warehouse": "Burnaby DC",
+    "stock": 37,
+    "reorder_point": 54,
+    "lead_time_days": 5,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1246",
+    "name": "Cheddar cheese shreds (10kg bag)",
+    "warehouse": "Burnaby DC",
+    "stock": 27,
+    "reorder_point": 32,
+    "lead_time_days": 10,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1256",
+    "name": "Mozzarella cheese shreds (10kg bag)",
+    "warehouse": "Richmond DC",
+    "stock": 198,
+    "reorder_point": 143,
+    "lead_time_days": 10,
+    "avg_daily_usage": 10
+  },
+  {
+    "sku": "FF-1261",
+    "name": "Butter (unsalted) (25kg block)",
+    "warehouse": "Surrey Plant",
+    "stock": 13,
+    "reorder_point": 41,
+    "lead_time_days": 14,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1271",
+    "name": "Almond milk (bulk) (20L carton)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 3,
+    "reorder_point": 16,
+    "lead_time_days": 5,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1278",
+    "name": "Oat milk (bulk) (20L carton)",
+    "warehouse": "Surrey Plant",
+    "stock": 225,
+    "reorder_point": 56,
+    "lead_time_days": 6,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1285",
+    "name": "Whole wheat wraps (case of 200)",
+    "warehouse": "Surrey Plant",
+    "stock": 74,
+    "reorder_point": 46,
+    "lead_time_days": 4,
+    "avg_daily_usage": 8
+  },
+  {
+    "sku": "FF-1290",
+    "name": "Gluten-free wraps (case of 150)",
+    "warehouse": "Burnaby DC",
+    "stock": 17,
+    "reorder_point": 49,
+    "lead_time_days": 8,
+    "avg_daily_usage": 5
+  },
+  {
+    "sku": "FF-1298",
+    "name": "Multigrain bread loaves (case of 40)",
+    "warehouse": "Richmond DC",
+    "stock": 71,
+    "reorder_point": 11,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2
+  },
+  {
+    "sku": "FF-1302",
+    "name": "Chia seeds (10kg bag)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 452,
+    "reorder_point": 74,
+    "lead_time_days": 6,
+    "avg_daily_usage": 10
+  },
+  {
+    "sku": "FF-1310",
+    "name": "Flax seeds (10kg bag)",
+    "warehouse": "Richmond DC",
+    "stock": 58,
+    "reorder_point": 37,
+    "lead_time_days": 7,
+    "avg_daily_usage": 4
+  },
+  {
+    "sku": "FF-1321",
+    "name": "Rolled oats (25kg bag)",
+    "warehouse": "Abbotsford Hub",
+    "stock": 54,
+    "reorder_point": 68,
+    "lead_time_days": 3,
+    "avg_daily_usage": 15
+  }
+]
