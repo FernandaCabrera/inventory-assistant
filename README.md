@@ -1,70 +1,81 @@
-# Getting Started with Create React App
+# Inventory Assistant
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An AI-powered inventory analyst for food manufacturing operations. Ask questions in plain language, get decision-ready answers with real calculations — reorder timing, days of cover, and concrete purchasing recommendations — not just raw data.
 
-## Available Scripts
+Built to demonstrate applied AI product thinking: structured LLM output, a live interactive dashboard, automated email alerts, and exportable operational reports, all backed by a real inventory dataset.
 
-In the project directory, you can run:
+## What it does
 
-### `npm start`
+- **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
+- **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
+- **Interactive dashboard** — live KPI cards and charts (status breakdown, days of cover, warehouse distribution) that scale cleanly whether the dataset has 6 SKUs or 500.
+- **Excel export** — every answer can be exported as a formatted workbook with a narrative report sheet and a color-coded action plan table.
+- **Automated email alerts** — a scheduled job checks the dataset and emails a formatted alert whenever SKUs fall below their reorder point.
+- **Data protection by design** — sensitive fields (customer names, emails, phone numbers, etc.) are automatically filtered out before any data is sent to the AI, regardless of what the dataset contains.
+- **Conversation memory** — follow-up questions ("what about that SKU in another warehouse?") work naturally within a session.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Tech stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **Frontend:** React, Recharts (dashboard), ExcelJS (report export), QuickChart (chart images)
+- **Backend:** Node.js, Express
+- **AI:** Anthropic Claude API (Sonnet), structured JSON output (narrative + action items + relevant charts)
+- **Email:** Resend, node-cron for scheduled checks
 
-### `npm test`
+## Architecture
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+The frontend never talks to the Claude API directly. All requests go through a small Express backend, which holds the API key server-side and applies a data-sanitization layer before anything is sent to the model.
 
-### `npm run build`
+```
+React app (browser)
+      │
+      ▼
+Express backend  ──►  Claude API (Sonnet)
+      │
+      ▼
+Resend (email alerts, on a cron schedule)
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Running locally
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**1. Install dependencies**
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+npm install
+cd server && npm install
+```
 
-### `npm run eject`
+**2. Set environment variables**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Create `server/.env`:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+ANTHROPIC_API_KEY=your_key_here
+RESEND_API_KEY=your_key_here
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+**3. Run the backend**
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+cd server
+node server.js
+```
 
-## Learn More
+**4. Run the frontend** (in a separate terminal)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+npm start
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+The app opens at `http://localhost:3000`.
 
-### Code Splitting
+## Sample dataset
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+`src/data/inventory.json` contains a sample food-manufacturing inventory across multiple warehouses, used to demonstrate the assistant's analysis. Swap in your own dataset with the same shape (`sku`, `name`, `warehouse`, `stock`, `reorder_point`, `lead_time_days`, `avg_daily_usage`) to try it with different data.
 
-### Analyzing the Bundle Size
+## Screenshots
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+*(add screenshots of the chat, dashboard, and Excel export here)*
 
-### Making a Progressive Web App
+## Notes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This is a portfolio/demo project. For production use with real customer or business data, review the retention and zero-data-retention options in Anthropic's API documentation, and confirm the sanitization rules in `server.js` cover all sensitive fields relevant to your dataset.
