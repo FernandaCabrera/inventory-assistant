@@ -317,13 +317,13 @@ function renderWithBold(text) {
   });
 }
 
-function Message({ role, text, onExport, isExporting }) {
+function Message({ role, text, onExport, isExporting, isMobile }) {
   const isUser = role === "user";
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 16 }}>
       <div
         style={{
-          maxWidth: "80%",
+          maxWidth: isMobile ? "94%" : "80%",
           background: isUser ? COLORS.ink : COLORS.surface,
           color: isUser ? "#F4F1EA" : COLORS.ink,
           border: isUser ? "none" : `1px solid ${COLORS.line}`,
@@ -918,6 +918,7 @@ export default function InventoryAssistant() {
                   key={i}
                   role={m.role}
                   text={m.text}
+                  isMobile={isMobile}
                   isExporting={exportingIndex === i}
                   onExport={m.role === "assistant" && i > 0 ? () => exportReport(m.text, m.actionItems || [], m.relevantCharts || [], i) : null}
                 />
@@ -937,6 +938,7 @@ export default function InventoryAssistant() {
               )}
             </div>
 
+            {!typing && (
             <div style={{ padding: "10px 20px 0", display: "flex", flexWrap: "wrap", gap: 7, borderTop: `1px solid ${COLORS.line}`, paddingTop: 14 }}>
               {QUICK_PROMPTS.map((q) => (
                 <button
@@ -977,6 +979,7 @@ export default function InventoryAssistant() {
                 <FileText size={12} /> Generate Status Report
               </button>
             </div>
+            )}
 
             <div style={{ padding: 16, display: "flex", gap: 8 }}>
               <input
