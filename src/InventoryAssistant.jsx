@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Package, Lock, Clock, Download, Eye, EyeOff, FileText, Search, RotateCcw, Loader2 } from "lucide-react";
+import { Send, Package, Lock, Clock, Download, Eye, EyeOff, FileText, Search, RotateCcw, Loader2, ArrowRight } from "lucide-react";
 import inventory from "./data/inventory.json";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
 import {
@@ -61,19 +61,35 @@ function useGoogleFonts() {
   }, []);
 }
 
-function BarcodeStrip() {
+function BarcodeStrip({ animated = false }) {
   const bars = Array.from({ length: 60 }, () => Math.random() > 0.5);
   return (
-    <div style={{ display: "flex", gap: 2, height: 14, alignItems: "stretch", opacity: 0.55 }}>
-      {bars.map((wide, i) => (
+    <div style={{ position: "relative", height: 14, overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: 2, height: 14, alignItems: "stretch", opacity: 0.55 }}>
+        {bars.map((wide, i) => (
+          <div
+            key={i}
+            style={{
+              width: wide ? 3 : 1.5,
+              background: COLORS.ink,
+            }}
+          />
+        ))}
+      </div>
+      {animated && (
         <div
-          key={i}
+          className="ia-scanline"
           style={{
-            width: wide ? 3 : 1.5,
-            background: COLORS.ink,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: 3,
+            height: "100%",
+            background: COLORS.critical,
+            boxShadow: `0 0 6px ${COLORS.critical}`,
           }}
         />
-      ))}
+      )}
     </div>
   );
 }
@@ -371,9 +387,129 @@ const FULL_REPORT_PROMPT =
   "reorder actions required, excess and slow-moving inventory, and recommendations — the kind presented " +
   "in a weekly operations review meeting.";
 
+function playScanBeep() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(1800, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.12);
+  } catch (err) {
+    // Audio not available — fail silently, not critical to app function.
+  }
+}
+
+function WelcomeScreen({ onEnter }) {
+  return (
+    <div
+      style={{
+        fontFamily: "'Inter', system-ui, sans-serif",
+        background: COLORS.bg,
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        textAlign: "center",
+      }}
+    >
+      <style>{`
+        @keyframes ia-scan {
+          0% { left: 0%; opacity: 1; }
+          45% { opacity: 1; }
+          50% { left: calc(100% - 3px); opacity: 1; }
+          55% { opacity: 0; }
+          100% { left: 0%; opacity: 0; }
+        }
+        .ia-scanline { animation: ia-scan 2.2s ease-in-out infinite; }
+      `}</style>
+      <div
+        style={{
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: "0.2em",
+          color: COLORS.inkMuted,
+          textTransform: "uppercase",
+          marginBottom: 14,
+        }}
+      >
+        Inventory Manifest · Powered by MiKardex
+      </div>
+
+      <h1
+        style={{
+          fontFamily: "'Oswald', sans-serif",
+          fontSize: "clamp(36px, 8vw, 64px)",
+          fontWeight: 600,
+          color: COLORS.ink,
+          margin: 0,
+          letterSpacing: "0.01em",
+          textTransform: "uppercase",
+          lineHeight: 1.1,
+        }}
+      >
+        Ask Your Inventory
+      </h1>
+
+      <div style={{ margin: "22px 0", maxWidth: 420, width: "100%" }}>
+        <BarcodeStrip animated />
+      </div>
+
+      <p
+        style={{
+          fontFamily: "'Inter', system-ui, sans-serif",
+          fontSize: 15,
+          color: COLORS.inkMuted,
+          maxWidth: 440,
+          lineHeight: 1.6,
+          marginBottom: 32,
+        }}
+      >
+        An AI operations analyst for your inventory. Ask about stockouts, excess stock, and reorder
+        timing — or generate a full status report in seconds.
+      </p>
+
+      <button
+        onClick={() => {
+          playScanBeep();
+          setTimeout(onEnter, 150);
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          padding: "14px 26px",
+          borderRadius: 8,
+          border: "none",
+          background: COLORS.ink,
+          color: "#F4F1EA",
+          cursor: "pointer",
+        }}
+      >
+        Enter Assistant <ArrowRight size={15} />
+      </button>
+    </div>
+  );
+}
+
 export default function InventoryAssistant() {
   useGoogleFonts();
   const isMobile = useIsMobile();
+  const [hasEntered, setHasEntered] = useState(false);
   const warehouseCount = new Set(inventory.map((i) => i.warehouse)).size;
   const [messages, setMessages] = useState([
     {
@@ -588,6 +724,10 @@ export default function InventoryAssistant() {
     }
   }
 
+  if (!hasEntered) {
+    return <WelcomeScreen onEnter={() => setHasEntered(true)} />;
+  }
+
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" }}>
       <style>{`
@@ -607,7 +747,7 @@ export default function InventoryAssistant() {
             marginBottom: 6,
           }}
         >
-          Inventory Manifest · FoodCo Operations
+          Inventory Manifest · Powered by MiKardex
         </div>
         <h1
           style={{
