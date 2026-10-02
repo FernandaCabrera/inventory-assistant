@@ -474,6 +474,56 @@ function playScanBeep() {
   }
 }
 
+// The second tool: conclusions from a cycle count report. Shown on the home page and, while no
+// report is loaded, in the cycle count tab. counts is the report loaded in this visit, if any.
+function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false }) {
+  return (
+    <section
+      data-testid="counts-band"
+      style={{
+        width: "100%",
+        maxWidth: 960,
+        margin: flush ? 0 : "0 auto 36px",
+        textAlign: "left",
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.ink}`,
+        borderRadius: 12,
+        padding: "24px 24px 22px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+        <ClipboardCheck size={20} color={COLORS.ink} />
+        <h2 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 600, textTransform: "uppercase", color: COLORS.ink, margin: 0, letterSpacing: "0.01em" }}>
+          {t("countsTitle")}
+        </h2>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#FFFFFF", background: COLORS.critical, borderRadius: 4, padding: "3px 7px" }}>
+          {t("countsTag")}
+        </span>
+      </div>
+      <p style={{ fontSize: 15, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px", maxWidth: 760 }}>{t("countsBody")}</p>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        {counts && (
+          <button onClick={onContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("countsBack", { name: counts.fileName })}</span>
+            <ArrowRight size={15} style={{ flexShrink: 0 }} />
+          </button>
+        )}
+        <button onClick={onUpload} data-testid="counts-upload" style={{ ...(counts ? secondaryButton : primaryButton), padding: "12px 20px" }}>
+          <Upload size={15} /> {t("countsUpload")}
+        </button>
+        <button onClick={onSample} data-testid="counts-sample" style={{ ...secondaryButton, padding: "12px 20px" }}>
+          {t("countsSample")} <ArrowRight size={15} />
+        </button>
+      </div>
+      <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: 0 }}>
+        <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
+        {t("countsPrivacy")}
+      </p>
+    </section>
+  );
+}
+
 function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue }) {
   return (
     <div
@@ -597,50 +647,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current
       )}
       </div>
 
-      {/* The second tool: conclusions from a cycle count report */}
-      <section
-        data-testid="counts-band"
-        style={{
-          width: "100%",
-          maxWidth: 960,
-          margin: "0 auto 36px",
-          textAlign: "left",
-          background: COLORS.surface,
-          border: `1px solid ${COLORS.ink}`,
-          borderRadius: 12,
-          padding: "24px 24px 22px",
-          boxSizing: "border-box",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <ClipboardCheck size={20} color={COLORS.ink} />
-          <h2 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 600, textTransform: "uppercase", color: COLORS.ink, margin: 0, letterSpacing: "0.01em" }}>
-            {t("countsTitle")}
-          </h2>
-          <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#FFFFFF", background: COLORS.critical, borderRadius: 4, padding: "3px 7px" }}>
-            {t("countsTag")}
-          </span>
-        </div>
-        <p style={{ fontSize: 15, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px", maxWidth: 760 }}>{t("countsBody")}</p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-          {counts && (
-            <button onClick={onCountContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("countsBack", { name: counts.fileName })}</span>
-              <ArrowRight size={15} style={{ flexShrink: 0 }} />
-            </button>
-          )}
-          <button onClick={onCountUpload} data-testid="counts-upload" style={{ ...(counts ? secondaryButton : primaryButton), padding: "12px 20px" }}>
-            <Upload size={15} /> {t("countsUpload")}
-          </button>
-          <button onClick={onCountSample} data-testid="counts-sample" style={{ ...secondaryButton, padding: "12px 20px" }}>
-            {t("countsSample")} <ArrowRight size={15} />
-          </button>
-        </div>
-        <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: 0 }}>
-          <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
-          {t("countsPrivacy")}
-        </p>
-      </section>
+      <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} />
 
       <HomeSections t={t} onPrivacy={onPrivacy} />
       <Footer t={t} onPrivacy={onPrivacy} />
@@ -798,12 +805,24 @@ export default function InventoryAssistant() {
     window.scrollTo(0, 0);
   }
 
+  // Opens the count report: as a tab next to the dashboard when an inventory is loaded,
+  // on its own when there is none.
+  function showCountReport() {
+    if (dataset) {
+      setHasEntered(true);
+      setView("counts");
+      setShowCounts(false);
+    } else {
+      setShowCounts(true);
+    }
+    window.scrollTo(0, 0);
+  }
+
   function handleCountsImported(imported) {
     setCounts({ ...imported, source: "upload" });
     setCountInputs({ total: "", counted: "", cycle: null });
     setShowCountImport(false);
-    setShowCounts(true);
-    window.scrollTo(0, 0);
+    showCountReport();
   }
 
   // The example goes through the same steps as an uploaded file
@@ -818,8 +837,7 @@ export default function InventoryAssistant() {
     setCounts(sampleCounts(lang));
     // a two-month cycle, so the example has locations on both sides of it
     setCountInputs({ total: String(SAMPLE_COUNT_TOTAL_LOCATIONS), counted: "", cycle: 60 });
-    setShowCounts(true);
-    window.scrollTo(0, 0);
+    showCountReport();
   }
 
   // What "Continue" on the home page opens: the visitor's own file if there is one, else the sample.
@@ -1171,7 +1189,6 @@ export default function InventoryAssistant() {
             t={t}
             paid={paid}
             onHome={goHome}
-            onBack={hasEntered ? () => setShowCounts(false) : null}
             onReplace={openCountImport}
             onUpgrade={setUpgradeReason}
           />
@@ -1199,10 +1216,7 @@ export default function InventoryAssistant() {
           counts={counts}
           onCountUpload={openCountImport}
           onCountSample={loadSampleCounts}
-          onCountContinue={() => {
-            setShowCounts(true);
-            window.scrollTo(0, 0);
-          }}
+          onCountContinue={showCountReport}
         />
         {modals}
       </>
@@ -1233,11 +1247,12 @@ export default function InventoryAssistant() {
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {header}
 
-        <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.line}` }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.line}`, overflowX: "auto" }}>
           {[
             { key: "assistant", label: t("tabAssistant") },
             { key: "orders", label: t("tabOrders"), count: orderList.rows.length },
             { key: "dashboard", label: t("tabDashboard") },
+            { key: "counts", label: t("tabCounts") },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -1252,6 +1267,8 @@ export default function InventoryAssistant() {
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
                 padding: "9px 16px",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
                 border: "none",
                 borderBottom: view === tab.key ? `2px solid ${COLORS.ink}` : "2px solid transparent",
                 background: "none",
@@ -1280,6 +1297,21 @@ export default function InventoryAssistant() {
           ))}
         </div>
 
+        {view === "counts" ? (
+          counts ? (
+            <CycleCounts data={counts} inputs={countInputs} onInputs={setCountInputs} lang={lang} t={t} paid={paid} onHome={goHome} onReplace={openCountImport} onUpgrade={setUpgradeReason} />
+          ) : (
+            <div data-testid="counts-tab-empty">
+              <div style={{ display: "flex", marginBottom: 18 }}>
+                <button onClick={goHome} style={chipButtonStyle} data-testid="home">
+                  <Home size={11} /> {t("home")}
+                </button>
+              </div>
+              <CountsIntro t={t} counts={null} onUpload={openCountImport} onSample={loadSampleCounts} flush />
+            </div>
+          )
+        ) : (
+        <>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
           <button onClick={goHome} style={chipButtonStyle} data-testid="home">
             <Home size={11} /> {t("home")}
@@ -1406,10 +1438,7 @@ export default function InventoryAssistant() {
                   inputs={countInputs}
                   lang={lang}
                   t={t}
-                  onOpen={() => {
-                    setShowCounts(true);
-                    window.scrollTo(0, 0);
-                  }}
+                  onOpen={showCountReport}
                   onUpload={openCountImport}
                   onSample={loadSampleCounts}
                 />
@@ -1662,6 +1691,8 @@ export default function InventoryAssistant() {
             </div>
           </div>
           </>
+        )}
+        </>
         )}
         <Footer t={t} onPrivacy={openPrivacy} />
       </div>

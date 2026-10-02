@@ -31,6 +31,65 @@ function addTable(workbook, name, columns, rows) {
   });
 }
 
+async function save(workbook, name) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// The list of last counts exactly as it is on screen: the rows left after the filter, the area and the search.
+// The header is on the first row so the sheet can be sorted, filtered or printed as a count list.
+// details: { filter, zone, query } as the analyst sees them
+export async function exportLastCounted({ rows, details, analysis: a, lang, t, fileName }) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "MiKardex";
+  workbook.created = new Date();
+  const tn = (key) => t(a.hasLocations ? key : `${key}P`);
+  const hasWarehouse = rows.some((row) => row.warehouse);
+  const hasZone = a.hasLocations && rows.some((row) => row.zone);
+
+  addTable(
+    workbook,
+    t("xlsCcLastSheet"),
+    [
+      hasWarehouse && { header: t("xlsWarehouse"), width: 14, value: (o) => o.warehouse },
+      { header: tn("ccColLocation"), width: 22, value: (o) => o.location },
+      hasZone && { header: t("ccColZone"), width: 12, value: (o) => o.zone },
+      { header: t("ccColLast"), width: 16, value: (o) => (o.last === null ? "" : new Date(o.last)), format: "yyyy-mm-dd" },
+      { header: `${t("ccColSince")} (${shortDate(lang, a.asOf)})`, width: 30, value: (o) => (o.last === null ? "" : o.daysSince) },
+      { header: t("ccColStatus"), width: 22, value: (o) => (o.last === null ? t("ccLastNever") : o.overdue ? t("ccOutside") : t("ccWithin")) },
+    ].filter(Boolean),
+    rows
+  );
+
+  const info = workbook.addWorksheet(t("xlsCcLastInfo"));
+  info.columns = [{ width: 26 }, { width: 64 }];
+  [
+    [t("xlsCcSource"), fileName],
+    [t("ccCycleTitle"), t(`ccCycleOpt_${a.cycle.days}`)],
+    [t("ccFilterLabel"), details.filter],
+    details.zone !== null && [t("ccColZone"), details.zone || "—"],
+    details.query && [t("xlsCcSearch"), details.query],
+    [t("xlsCcRows"), rows.length],
+    [t("xlsCcGenerated"), new Date().toLocaleString(LOCALES[lang])],
+  ]
+    .filter(Boolean)
+    .forEach(([label, value]) => {
+      const row = info.addRow([label, value]);
+      row.getCell(1).font = { bold: true };
+      row.getCell(2).alignment = { horizontal: "left" };
+    });
+  info.addRow([]);
+  info.addRow([t("xlsFooter")]).font = { italic: true, size: 10, color: { argb: MUTED } };
+
+  await save(workbook, tn("xlsCcLastFile"));
+}
+
 export async function exportCountReport({ analysis: a, findings, lang, t, fileName }) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "MiKardex";
@@ -250,12 +309,5 @@ export async function exportCountReport({ analysis: a, findings, lang, t, fileNa
     );
   }
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${t("xlsCcFile")}-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  link.click();
-  URL.revokeObjectURL(url);
+  await save(workbook, t("xlsCcFile"));
 }

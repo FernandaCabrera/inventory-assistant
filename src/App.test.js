@@ -1,5 +1,6 @@
-import { render, screen, fireEvent, act, within } from "@testing-library/react";
+import { render, screen, fireEvent, act, within, waitFor } from "@testing-library/react";
 import App from "./App";
+import { exportLastCounted } from "./countExport";
 
 jest.mock("recharts", () => {
   const Stub = ({ children }) => <div>{children}</div>;
@@ -9,6 +10,7 @@ jest.mock("recharts", () => {
   };
 });
 jest.mock("exceljs/dist/exceljs.min.js", () => ({ Workbook: function Workbook() {} }));
+jest.mock("./countExport", () => ({ exportCountReport: jest.fn(() => Promise.resolve()), exportLastCounted: jest.fn(() => Promise.resolve()) }));
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -275,12 +277,79 @@ test("the dashboard has the cycle counts, and the way to the report and back", (
   fireEvent.click(screen.getByRole("button", { name: /Ver un ejemplo/ }));
   expect(screen.getByTestId("cycle-counts")).toBeInTheDocument();
 
-  // back in the dashboard, the same figures as the report
-  fireEvent.click(screen.getByTestId("count-back"));
+  // the report opened as the tab next to the dashboard; back in the dashboard, the same figures
+  expect(screen.getByRole("button", { name: "Conteo cíclico" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
   const block = screen.getByTestId("dash-counts");
   expect(block).toHaveTextContent("Dentro del ciclo");
   expect(block).toHaveTextContent("Fuera del ciclo");
   expect(block).toHaveTextContent("Dónde contar: ubicaciones fuera del ciclo de 60 días, por zona");
   fireEvent.click(screen.getByTestId("dash-counts-open"));
   expect(screen.getByTestId("count-conclusions")).toBeInTheDocument();
+});
+
+test("the cycle count has its own tab next to the dashboard", () => {
+  window.scrollTo = () => {};
+  jest.useFakeTimers();
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByText("Probar con datos de ejemplo"));
+  act(() => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+
+  const tabs = screen.getAllByRole("button").map((button) => button.textContent);
+  expect(tabs.indexOf("Conteo cíclico")).toBe(tabs.indexOf("Dashboard") + 1);
+
+  // nothing loaded: the tab offers to upload a report or see the example
+  fireEvent.click(screen.getByRole("button", { name: "Conteo cíclico" }));
+  expect(screen.getByTestId("counts-tab-empty")).toHaveTextContent("Informe de conteos cíclicos");
+  fireEvent.click(screen.getByTestId("counts-sample"));
+  expect(screen.getByTestId("count-conclusions")).toBeInTheDocument();
+
+  // the other tabs are still there, and the report is still in its tab on the way back
+  fireEvent.click(screen.getByRole("button", { name: "Asistente" }));
+  expect(screen.queryByTestId("cycle-counts")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Conteo cíclico" }));
+  expect(screen.getByTestId("cycle-counts")).toBeInTheDocument();
+
+  // from the home page, the report opens in its tab too
+  fireEvent.click(screen.getByTestId("home"));
+  fireEvent.click(screen.getByTestId("counts-continue"));
+  expect(screen.getByTestId("cycle-counts")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Dashboard" })).toBeInTheDocument();
+});
+
+test("the list of last counts is exported as it stands on screen", async () => {
+  window.scrollTo = () => {};
+  exportLastCounted.mockClear();
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByTestId("counts-sample"));
+
+  fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "outside" } });
+  const outside = Number(/Coincidencias: (\d+)/.exec(screen.getByTestId("count-last-matches").textContent)[1]);
+  expect(screen.getByTestId("count-last-export")).toHaveTextContent(`Exportar esta lista (Excel) · ${outside}`);
+  fireEvent.click(screen.getByTestId("count-last-export"));
+  await waitFor(() => expect(exportLastCounted).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId("count-last-export")).toHaveTextContent("Exportar esta lista"));
+  const sent = exportLastCounted.mock.calls[0][0];
+  expect(sent.rows).toHaveLength(outside); // every row of the filter, not only the ten on screen
+  expect(sent.rows.every((row) => row.overdue)).toBe(true);
+  expect(sent.details).toEqual({ filter: "Fuera del ciclo (más de 60 días sin contar)", zone: null, query: "" });
+  expect(sent.fileName).toBe("Datos de ejemplo");
+
+  // an area and a search narrow what is exported
+  fireEvent.click(within(screen.getByTestId("count-last-zones")).getAllByRole("button")[0]);
+  fireEvent.click(screen.getByTestId("count-last-export"));
+  await waitFor(() => expect(exportLastCounted).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByTestId("count-last-export")).toHaveTextContent("Exportar esta lista"));
+  const narrowed = exportLastCounted.mock.calls[1][0];
+  expect(narrowed.rows.length).toBeLessThan(outside);
+  expect(new Set(narrowed.rows.map((row) => row.zone)).size).toBe(1);
+  expect(narrowed.details.zone).toBe(narrowed.rows[0].zone);
+
+  fireEvent.change(screen.getByTestId("count-last-search"), { target: { value: "zz-99" } });
+  expect(screen.getByTestId("count-last-export")).toBeDisabled();
 });
