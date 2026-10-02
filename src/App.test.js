@@ -194,6 +194,15 @@ test("the cycle count example shows its conclusions and stays in the browser", (
   expect(screen.getByTestId("count-lots")).toBeInTheDocument();
   expect(screen.getByTestId("count-people")).toHaveTextContent("Estos nombres no salen de tu navegador");
 
+  // how long since a location was counted: any location can be looked up
+  expect(screen.getByText("Hace cuánto no se cuenta cada ubicación")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("count-last-search"), { target: { value: "d-11-1" } });
+  expect(screen.getByTestId("count-last-matches")).toHaveTextContent("Coincidencias: 1");
+  expect(screen.getByTestId("count-last")).toHaveTextContent("CD1 · D-11-1");
+  fireEvent.change(screen.getByTestId("count-last-search"), { target: { value: "zz-99" } });
+  expect(screen.getByTestId("count-last-matches")).toHaveTextContent("Nada coincide con esa búsqueda.");
+  fireEvent.change(screen.getByTestId("count-last-search"), { target: { value: "" } });
+
   // the coverage sentence depends on the number typed by the analyst
   fireEvent.change(screen.getByTestId("count-total"), { target: { value: "" } });
   expect(screen.queryByText(/Se contaron \d+ de 480 ubicaciones/)).not.toBeInTheDocument();

@@ -29,6 +29,7 @@ export function sentence(t, lang, part) {
   const vars = {};
   Object.entries(part.vars).forEach(([name, value]) => {
     if (name === "month") vars[name] = monthName(lang, value);
+    else if (name === "date") vars[name] = shortDate(lang, value);
     else if (typeof value !== "number") vars[name] = value;
     else if (PERCENT.includes(name)) vars[name] = percent(lang, value);
     else if (MONEY.includes(name) && part.key !== "ccUnits") vars[name] = formatMoney(lang, value);

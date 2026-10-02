@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock } from "lucide-react";
+import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock, Search } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
-import { COLORS, FONT_MONO, FONT_HEAD, monoLabel, primaryButton, textInput } from "./theme";
+import { COLORS, FONT_MONO, FONT_HEAD, FONT_BODY, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
 import { LOCALES, formatNumber, formatMoney } from "./i18n";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import { analyzeCounts, conclusions, CYCLE_OPTIONS } from "./countLogic";
@@ -63,6 +63,97 @@ function DataTable({ title, hint, columns, rows, more, testid }) {
         </table>
       </div>
       {rows.length > shown.length && <p style={{ ...hintText, margin: "10px 0 0" }}>{more}</p>}
+    </div>
+  );
+}
+
+// How long since each location was counted, with a search box: the question asked most often.
+// rows are oldest first. never (locations with no count date) only show up when searched for.
+function LastCountCard({ rows, never, asOf, withStatus, notes, lang, t, tn }) {
+  const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(COUNT_TABLE_ROWS);
+  const wanted = query.trim().toLowerCase();
+  const name = (row) => (row.warehouse ? `${row.warehouse} · ${row.location}` : row.location);
+  const matches = wanted
+    ? [...never.map((row) => ({ ...row, last: null })), ...rows].filter((row) => name(row).toLowerCase().includes(wanted))
+    : rows;
+  const visible = matches.slice(0, shown);
+  const tag = (text, color, background) => (
+    <span style={{ ...monoLabel, fontSize: 9.5, color, background, border: `1px solid ${color}`, borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap" }}>{text}</span>
+  );
+  const cell = { ...td, whiteSpace: "nowrap" };
+
+  return (
+    <div style={card} data-testid="count-last">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+        <div style={{ ...cardTitle, marginBottom: 0 }}>{tn("ccLastTitle")}</div>
+        <div style={{ position: "relative", flex: "0 1 260px" }}>
+          <Search size={13} color={COLORS.inkMuted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShown(COUNT_TABLE_ROWS);
+            }}
+            placeholder={tn("ccLastSearch")}
+            aria-label={tn("ccLastSearch")}
+            data-testid="count-last-search"
+            style={{ ...textInput, fontFamily: FONT_BODY, fontSize: 13, padding: "8px 10px 8px 30px" }}
+          />
+        </div>
+      </div>
+      <p style={hintText}>
+        {t("ccLastAsOf", { date: shortDate(lang, asOf) })} {notes.join(" ")}
+      </p>
+      {wanted && (
+        <p style={{ ...hintText, color: COLORS.ink }} data-testid="count-last-matches">
+          {matches.length > 0 ? t("ccLastMatches", { n: formatNumber(lang, matches.length) }) : t("ccLastNone")}
+        </p>
+      )}
+      {visible.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: "left" }}>{tn("ccColLocation")}</th>
+                <th style={{ ...th, textAlign: "left" }}>{t("ccColLast")}</th>
+                <th style={{ ...th, textAlign: "right" }}>{t("ccColSince")}</th>
+                {withStatus && <th style={{ ...th, textAlign: "left" }}>{t("ccColStatus")}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((row, i) => (
+                <tr key={i}>
+                  <td style={{ ...cell, fontFamily: FONT_MONO, fontSize: 12.5 }}>{name(row)}</td>
+                  <td style={cell}>{row.last === null ? "—" : shortDate(lang, row.last)}</td>
+                  <td style={{ ...cell, textAlign: "right", fontFamily: FONT_MONO, fontSize: 12.5, fontWeight: 600 }}>
+                    {row.last === null ? "—" : formatNumber(lang, row.daysSince)}
+                  </td>
+                  {withStatus && (
+                    <td style={cell}>
+                      {row.last === null
+                        ? tag(t("ccLastNever"), COLORS.critical, COLORS.criticalBg)
+                        : row.overdue
+                        ? tag(t("ccOutside"), COLORS.critical, COLORS.criticalBg)
+                        : tag(t("ccWithin"), COLORS.ok, COLORS.okBg)}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {matches.length > visible.length && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <button onClick={() => setShown((n) => n + 50)} data-testid="count-last-more" style={{ ...secondaryButton, padding: "7px 12px", fontSize: 11 }}>
+            {t("ccShowMore")}
+          </button>
+          <span style={{ fontSize: 12.5, color: COLORS.inkMuted }}>
+            {formatNumber(lang, visible.length)} / {formatNumber(lang, matches.length)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -420,17 +511,7 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                 ]}
               />
             )}
-            <DataTable
-              testid="count-oldest"
-              title={tn("ccOldestTitle")}
-              more={more}
-              rows={a.aging.oldest}
-              columns={[
-                { label: tn("ccColLocation"), mono: true, cell: (o) => (o.warehouse ? `${o.warehouse} · ${o.location}` : o.location) },
-                { label: t("ccColLast"), cell: (o) => shortDate(lang, o.last) },
-                { label: t("ccColSince"), right: true, cell: (o) => num(o.daysSince) },
-              ]}
-            />
+            <LastCountCard rows={a.lastCounted} never={a.aging.neverList} asOf={a.asOf} withStatus notes={[]} lang={lang} t={t} tn={tn} />
             {a.aging.neverList.length > 0 && (
               <div style={card} data-testid="count-never">
                 <div style={cardTitle}>
@@ -465,6 +546,18 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                   ...(a.mode === "detail" ? [{ label: t("ccColAccuracy"), right: true, cell: (z) => (z.accuracy === null ? "—" : percent(lang, z.accuracy)) }] : []),
                   { label: a.hasValue ? t("ccColAbs") : t("ccColAbsUnits"), right: true, cell: (z) => amount(a.hasValue ? z.absValue : z.absUnits) },
                 ]}
+              />
+            )}
+            {a.lastCounted.length > 0 && (
+              <LastCountCard
+                rows={a.lastCounted}
+                never={[]}
+                asOf={a.asOf}
+                withStatus={false}
+                notes={[tn("ccLastOnlyFile"), a.notInFile > 0 ? t("ccLastMissing", { n: num(a.notInFile) }) : ""].filter(Boolean)}
+                lang={lang}
+                t={t}
+                tn={tn}
               />
             )}
             <DataTable

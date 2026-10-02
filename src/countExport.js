@@ -89,20 +89,22 @@ export async function exportCountReport({ analysis: a, findings, lang, t, fileNa
   summary.addRow([]);
   summary.addRow([t("xlsFooter")]).font = { italic: true, size: 10, color: { argb: MUTED } };
 
+  // How long since each location was counted: every one in the file, oldest first
+  addTable(
+    workbook,
+    t("xlsCcAging"),
+    [
+      { header: t("xlsWarehouse"), width: 14, value: (o) => o.warehouse },
+      { header: tn("ccColLocation"), width: 20, value: (o) => o.location },
+      { header: t("ccColZone"), width: 12, value: (o) => o.zone },
+      { header: t("ccColLast"), width: 16, value: (o) => new Date(o.last), format: "yyyy-mm-dd" },
+      { header: `${t("ccColSince")} (${shortDate(lang, a.asOf)})`, width: 30, value: (o) => o.daysSince },
+      ...(coverage ? [{ header: t("ccKpiOverdue"), width: 16, value: (o) => (o.overdue ? "✓" : "") }] : []),
+    ],
+    a.lastCounted
+  );
+
   if (coverage) {
-    addTable(
-      workbook,
-      t("xlsCcAging"),
-      [
-        { header: t("xlsWarehouse"), width: 14, value: (o) => o.warehouse },
-        { header: tn("ccColLocation"), width: 20, value: (o) => o.location },
-        { header: t("ccColZone"), width: 12, value: (o) => o.zone },
-        { header: t("ccColLast"), width: 16, value: (o) => new Date(o.last), format: "yyyy-mm-dd" },
-        { header: t("ccColSince"), width: 18, value: (o) => o.daysSince },
-        { header: t("ccKpiOverdue"), width: 16, value: (o) => (o.overdue ? "✓" : "") },
-      ],
-      a.aging.oldest
-    );
     addTable(
       workbook,
       t("xlsCcNever"),
