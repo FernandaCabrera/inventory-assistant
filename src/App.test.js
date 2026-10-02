@@ -5,7 +5,7 @@ jest.mock("recharts", () => {
   const Stub = ({ children }) => <div>{children}</div>;
   return {
     BarChart: Stub, Bar: Stub, XAxis: Stub, YAxis: Stub, CartesianGrid: Stub, Tooltip: Stub, Cell: Stub,
-    ResponsiveContainer: Stub, PieChart: Stub, Pie: Stub, Legend: Stub,
+    ResponsiveContainer: Stub, PieChart: Stub, Pie: Stub, Legend: Stub, ReferenceLine: Stub,
   };
 });
 jest.mock("exceljs/dist/exceljs.min.js", () => ({ Workbook: function Workbook() {} }));
@@ -178,4 +178,39 @@ test("after trying the sample, the home page still leads back to the visitor's o
   fireEvent.click(screen.getByTestId("home"));
   fireEvent.click(screen.getByText("Continue with stock.xlsx"));
   expect(screen.getByText(/stock.xlsx loaded, products: 1/)).toBeInTheDocument();
+});
+
+test("the cycle count example shows its conclusions and stays in the browser", () => {
+  window.scrollTo = () => {};
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  expect(screen.getByText("Informe de conteos cíclicos")).toBeInTheDocument();
+  global.fetch.mockClear();
+
+  fireEvent.click(screen.getByTestId("counts-sample"));
+  expect(screen.getByText("Conclusiones")).toBeInTheDocument();
+  expect(screen.getByText(/La exactitud por línea es/)).toBeInTheDocument();
+  expect(screen.getByText(/Se contaron \d+ de 480 ubicaciones/)).toBeInTheDocument();
+  expect(screen.getByTestId("count-lots")).toBeInTheDocument();
+  expect(screen.getByTestId("count-people")).toHaveTextContent("Estos nombres no salen de tu navegador");
+
+  // the coverage sentence depends on the number typed by the analyst
+  fireEvent.change(screen.getByTestId("count-total"), { target: { value: "" } });
+  expect(screen.queryByText(/Se contaron \d+ de 480 ubicaciones/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Escribe arriba cuántas ubicaciones tiene la bodega/)).toBeInTheDocument();
+
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(Object.keys(window.localStorage).filter((key) => /count/i.test(key))).toEqual([]);
+
+  fireEvent.change(screen.getByTestId("count-total"), { target: { value: "600" } });
+  fireEvent.click(screen.getByTestId("home"));
+  expect(screen.getByTestId("counts-continue")).toHaveTextContent("Datos de ejemplo");
+
+  // what was typed is still there on the way back, and after a change of language
+  fireEvent.click(screen.getByTestId("counts-continue"));
+  expect(screen.getByTestId("count-total")).toHaveValue(600);
+  fireEvent.click(screen.getByRole("button", { name: "EN" }));
+  expect(screen.getByTestId("count-total")).toHaveValue(600);
+  expect(screen.getByText(/of 600 locations were counted/)).toBeInTheDocument();
+  expect(screen.getByText(/The first is Interfold paper towel x20/)).toBeInTheDocument();
 });

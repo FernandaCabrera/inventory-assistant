@@ -16,6 +16,8 @@ import {
   FileSpreadsheet,
   BadgeCheck,
   Home,
+  ClipboardCheck,
+  ShieldCheck,
 } from "lucide-react";
 import sampleInventory from "./data/inventory.json";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
@@ -43,24 +45,18 @@ import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HomeSections, Footer, PrivacyModal } from "./HomeSections";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
+import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
+import CountImportModal from "./CountImportModal";
+import CycleCounts from "./CycleCounts";
+import { pickSheet } from "./importLogic";
+import { guessCountMapping, validateCountMapping, buildCountLines } from "./countLogic";
+import { sampleCountGrid, SAMPLE_COUNT_TOTAL_LOCATIONS, SAMPLE_COUNT_FILE } from "./data/sampleCounts";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4001";
 
 // Most urgent first in lists
 const LIST_ORDER = { critical: 0, low: 1, idle: 2, excess: 3, ok: 4 };
 const SIDEBAR_LIMIT = 200;
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 760 : false);
-  useEffect(() => {
-    function handleResize() {
-      setIsMobile(window.innerWidth <= 760);
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-  return isMobile;
-}
 
 function useGoogleFonts() {
   useEffect(() => {
@@ -173,68 +169,6 @@ function StatusStamp({ status, t }) {
     >
       {t(`status_${status}`)}
     </span>
-  );
-}
-
-function KPICard({ label, value, color }) {
-  return (
-    <div
-      style={{
-        background: COLORS.surface,
-        border: `1px solid ${COLORS.line}`,
-        borderRadius: 10,
-        padding: "16px 18px",
-        flex: 1,
-        minWidth: 124,
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          fontFamily: FONT_MONO,
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          color: COLORS.inkMuted,
-          textTransform: "uppercase",
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 30, fontWeight: 600, color: color || COLORS.ink, whiteSpace: "nowrap" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function ChartCard({ title, children, height = 280 }) {
-  return (
-    <div
-      style={{
-        background: COLORS.surface,
-        border: `1px solid ${COLORS.line}`,
-        borderRadius: 10,
-        padding: "18px 18px 10px",
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: FONT_MONO,
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "0.06em",
-          color: COLORS.ink,
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        {title}
-      </div>
-      <div style={{ height }}>{children}</div>
-    </div>
   );
 }
 
@@ -536,7 +470,7 @@ function playScanBeep() {
   }
 }
 
-function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current, onContinue, onClear }) {
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue }) {
   return (
     <div
       style={{
@@ -659,37 +593,56 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current
       )}
       </div>
 
+      {/* The second tool: conclusions from a cycle count report */}
+      <section
+        data-testid="counts-band"
+        style={{
+          width: "100%",
+          maxWidth: 960,
+          margin: "0 auto 36px",
+          textAlign: "left",
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.ink}`,
+          borderRadius: 12,
+          padding: "24px 24px 22px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <ClipboardCheck size={20} color={COLORS.ink} />
+          <h2 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 600, textTransform: "uppercase", color: COLORS.ink, margin: 0, letterSpacing: "0.01em" }}>
+            {t("countsTitle")}
+          </h2>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#FFFFFF", background: COLORS.critical, borderRadius: 4, padding: "3px 7px" }}>
+            {t("countsTag")}
+          </span>
+        </div>
+        <p style={{ fontSize: 15, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px", maxWidth: 760 }}>{t("countsBody")}</p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+          {counts && (
+            <button onClick={onCountContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("countsBack", { name: counts.fileName })}</span>
+              <ArrowRight size={15} style={{ flexShrink: 0 }} />
+            </button>
+          )}
+          <button onClick={onCountUpload} data-testid="counts-upload" style={{ ...(counts ? secondaryButton : primaryButton), padding: "12px 20px" }}>
+            <Upload size={15} /> {t("countsUpload")}
+          </button>
+          <button onClick={onCountSample} data-testid="counts-sample" style={{ ...secondaryButton, padding: "12px 20px" }}>
+            {t("countsSample")} <ArrowRight size={15} />
+          </button>
+        </div>
+        <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: 0 }}>
+          <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
+          {t("countsPrivacy")}
+        </p>
+      </section>
+
       <HomeSections t={t} onPrivacy={onPrivacy} />
       <Footer t={t} onPrivacy={onPrivacy} />
     </div>
   );
 }
-
-const chipStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-  fontFamily: FONT_MONO,
-  fontSize: 10.5,
-  fontWeight: 500,
-  letterSpacing: "0.04em",
-  color: COLORS.inkMuted,
-  background: COLORS.surfaceAlt,
-  border: `1px solid ${COLORS.line}`,
-  padding: "5px 10px",
-  borderRadius: 5,
-  textTransform: "uppercase",
-  maxWidth: "100%",
-};
-
-const chipButtonStyle = {
-  ...chipStyle,
-  fontWeight: 600,
-  color: COLORS.ink,
-  background: "none",
-  border: `1px solid ${COLORS.ink}`,
-  cursor: "pointer",
-};
 
 function loadStoredDataset() {
   const stored = load("dataset", null);
@@ -739,6 +692,11 @@ export default function InventoryAssistant() {
   const [upgradeReason, setUpgradeReason] = useState(null); // null = closed
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [coverDays, setCoverDays] = useState(() => String(load("coverDays", ORDER_COVER_DAYS)));
+  // Cycle count report. Kept only while the page is open: it is never saved or sent anywhere.
+  const [counts, setCounts] = useState(null);
+  const [countInputs, setCountInputs] = useState({ total: "", counted: "", cycle: null });
+  const [showCounts, setShowCounts] = useState(false);
+  const [showCountImport, setShowCountImport] = useState(false);
   const scrollRef = useRef(null);
 
   const items = useMemo(() => (dataset ? dataset.items : []), [dataset]);
@@ -792,6 +750,8 @@ export default function InventoryAssistant() {
   function changeLang(next) {
     setLang(next);
     save("lang", next);
+    // the count example has product names and reasons in the language it was built in
+    if (counts && counts.source === "sample") setCounts(sampleCounts(next));
   }
 
   function greetingText() {
@@ -829,7 +789,31 @@ export default function InventoryAssistant() {
   // Back to the home page. The loaded data stays; the home page offers the way back to it.
   function goHome() {
     setHasEntered(false);
+    setShowCounts(false);
     setView("assistant");
+    window.scrollTo(0, 0);
+  }
+
+  function handleCountsImported(imported) {
+    setCounts({ ...imported, source: "upload" });
+    setCountInputs({ total: "", counted: "", cycle: null });
+    setShowCountImport(false);
+    setShowCounts(true);
+    window.scrollTo(0, 0);
+  }
+
+  // The example goes through the same steps as an uploaded file
+  function sampleCounts(language) {
+    const picked = pickSheet([{ name: "sample", grid: sampleCountGrid(language) }], { guess: guessCountMapping, validate: validateCountMapping, scanRows: 40 });
+    const sheet = picked.candidates[picked.bestIndex];
+    const built = buildCountLines(sheet.table, sheet.mapping);
+    return { ...built, source: "sample", fileName: SAMPLE_COUNT_FILE[language] };
+  }
+
+  function loadSampleCounts() {
+    setCounts(sampleCounts(lang));
+    setCountInputs({ total: String(SAMPLE_COUNT_TOTAL_LOCATIONS), counted: "", cycle: null });
+    setShowCounts(true);
     window.scrollTo(0, 0);
   }
 
@@ -887,6 +871,8 @@ export default function InventoryAssistant() {
   }
 
   const closeImport = useCallback(() => setShowImport(false), []);
+  const openCountImport = useCallback(() => setShowCountImport(true), []);
+  const closeCountImport = useCallback(() => setShowCountImport(false), []);
   const closeUpgrade = useCallback(() => setUpgradeReason(null), []);
   const openPrivacy = useCallback(() => setShowPrivacy(true), []);
   const closePrivacy = useCallback(() => setShowPrivacy(false), []);
@@ -1098,6 +1084,7 @@ export default function InventoryAssistant() {
   const modals = (
     <>
       {showImport && <ImportModal lang={lang} t={t} onClose={closeImport} onImported={handleImported} />}
+      {showCountImport && <CountImportModal lang={lang} t={t} onClose={closeCountImport} onImported={handleCountsImported} />}
       {upgradeReason !== null && (
         <UpgradeModal
           t={t}
@@ -1113,6 +1100,82 @@ export default function InventoryAssistant() {
     </>
   );
 
+  const header = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div
+          style={{ minWidth: 0, cursor: "pointer" }}
+          onClick={goHome}
+          role="link"
+          tabIndex={0}
+          title={t("home")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") goHome();
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.16em",
+              color: COLORS.inkMuted,
+              textTransform: "uppercase",
+              marginBottom: 6,
+            }}
+          >
+            {t("brand")}
+          </div>
+          <h1
+            style={{
+              fontFamily: FONT_HEAD,
+              fontSize: isMobile ? 24 : 34,
+              fontWeight: 600,
+              color: COLORS.ink,
+              margin: 0,
+              letterSpacing: "0.01em",
+              textTransform: "uppercase",
+            }}
+          >
+            {t("title")}
+          </h1>
+        </div>
+        <div style={{ flexShrink: 0 }}>
+          <LanguageToggle lang={lang} onChange={changeLang} />
+        </div>
+      </div>
+
+      <div style={{ margin: "16px 0 18px" }}>
+        <BarcodeStrip />
+      </div>
+    </>
+  );
+  const pageStyle = { fontFamily: FONT_BODY, background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" };
+
+  if (showCounts && counts) {
+    return (
+      <div style={pageStyle}>
+        <GlobalStyles />
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          {header}
+          <CycleCounts
+            data={counts}
+            inputs={countInputs}
+            onInputs={setCountInputs}
+            lang={lang}
+            t={t}
+            paid={paid}
+            onHome={goHome}
+            onReplace={openCountImport}
+            onUpgrade={setUpgradeReason}
+          />
+          <Footer t={t} onPrivacy={openPrivacy} />
+        </div>
+        {modals}
+      </div>
+    );
+  }
+
   if (!hasEntered) {
     return (
       <>
@@ -1127,6 +1190,13 @@ export default function InventoryAssistant() {
           current={continueTarget()}
           onContinue={continueToData}
           onClear={clearData}
+          counts={counts}
+          onCountUpload={openCountImport}
+          onCountSample={loadSampleCounts}
+          onCountContinue={() => {
+            setShowCounts(true);
+            window.scrollTo(0, 0);
+          }}
         />
         {modals}
       </>
@@ -1152,56 +1222,10 @@ export default function InventoryAssistant() {
   });
 
   return (
-    <div style={{ fontFamily: FONT_BODY, background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" }}>
+    <div style={pageStyle}>
       <GlobalStyles />
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-          <div
-            style={{ minWidth: 0, cursor: "pointer" }}
-            onClick={goHome}
-            role="link"
-            tabIndex={0}
-            title={t("home")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") goHome();
-            }}
-          >
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.16em",
-                color: COLORS.inkMuted,
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
-              {t("brand")}
-            </div>
-            <h1
-              style={{
-                fontFamily: FONT_HEAD,
-                fontSize: isMobile ? 24 : 34,
-                fontWeight: 600,
-                color: COLORS.ink,
-                margin: 0,
-                letterSpacing: "0.01em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t("title")}
-            </h1>
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <LanguageToggle lang={lang} onChange={changeLang} />
-          </div>
-        </div>
-
-        <div style={{ margin: "16px 0 18px" }}>
-          <BarcodeStrip />
-        </div>
+        {header}
 
         <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.line}` }}>
           {[
