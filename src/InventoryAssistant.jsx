@@ -15,6 +15,7 @@ import {
   Upload,
   FileSpreadsheet,
   BadgeCheck,
+  Home,
 } from "lucide-react";
 import sampleInventory from "./data/inventory.json";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
@@ -535,7 +536,7 @@ function playScanBeep() {
   }
 }
 
-function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy }) {
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current, onContinue, onClear }) {
   return (
     <div
       style={{
@@ -600,15 +601,27 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy }) {
 
       <p style={{ fontSize: 15.5, color: COLORS.inkMuted, maxWidth: 470, lineHeight: 1.6, margin: "0 0 28px" }}>{t("tagline")}</p>
 
+      {/* Someone who already loaded a file gets the way back to it first */}
+      {current && (
+        <button
+          onClick={onContinue}
+          data-testid="continue"
+          style={{ ...primaryButton, padding: "14px 24px", fontSize: 13, marginBottom: 12, maxWidth: "100%" }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("continueWith", { name: current.name })}</span>
+          <ArrowRight size={15} style={{ flexShrink: 0 }} />
+        </button>
+      )}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         <button
           onClick={() => {
             playScanBeep();
             onUpload();
           }}
-          style={{ ...primaryButton, padding: "14px 24px", fontSize: 13 }}
+          style={{ ...(current ? secondaryButton : primaryButton), padding: "14px 24px", fontSize: 13 }}
         >
-          <Upload size={15} /> {t("uploadCta")}
+          <Upload size={15} /> {current && current.isUpload ? t("replaceData") : t("uploadCta")}
         </button>
         <button
           onClick={() => {
@@ -625,6 +638,25 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy }) {
         {t("freeNote", { uploads: FREE_UPLOADS, questions: FREE_QUESTIONS })}
       </p>
       <p style={{ fontSize: 12.5, color: COLORS.inkMuted, maxWidth: 440, lineHeight: 1.55, margin: 0 }}>{t("privacy")}</p>
+      {current && current.isUpload && (
+        <button
+          onClick={onClear}
+          style={{
+            marginTop: 14,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: 12.5,
+            color: COLORS.inkMuted,
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          {t("clearData")}
+        </button>
+      )}
       </div>
 
       <HomeSections t={t} onPrivacy={onPrivacy} />
@@ -792,6 +824,44 @@ export default function InventoryAssistant() {
     setDataset({ items: sampleInventory, source: "sample", fileName: null, loadedAt: new Date().toISOString() });
     resetConversation();
     setHasEntered(true);
+  }
+
+  // Back to the home page. The loaded data stays; the home page offers the way back to it.
+  function goHome() {
+    setHasEntered(false);
+    setView("assistant");
+    window.scrollTo(0, 0);
+  }
+
+  // What "Continue" on the home page opens: the visitor's own file if there is one, else the sample.
+  function continueTarget() {
+    if (dataset && dataset.source === "upload") return { name: dataset.fileName, isUpload: true };
+    const stored = loadStoredDataset();
+    if (stored) return { name: stored.fileName, isUpload: true };
+    if (dataset) return { name: t("sampleData"), isUpload: false };
+    return null;
+  }
+
+  function continueToData() {
+    if (dataset && dataset.source === "upload") {
+      setHasEntered(true); // same data, same conversation
+      return;
+    }
+    const stored = loadStoredDataset();
+    if (stored) {
+      // they were looking at the sample: bring their own file back
+      setDataset(stored);
+      resetConversation();
+    }
+    if (stored || dataset) setHasEntered(true);
+  }
+
+  function clearData() {
+    if (!window.confirm(t("clearConfirm"))) return;
+    remove("dataset");
+    setDataset(null);
+    setSearchQuery("");
+    resetConversation();
   }
 
   function requestUpload() {
@@ -1047,7 +1117,17 @@ export default function InventoryAssistant() {
     return (
       <>
         <GlobalStyles />
-        <WelcomeScreen lang={lang} t={t} onLang={changeLang} onUpload={requestUpload} onSample={loadSampleData} onPrivacy={openPrivacy} />
+        <WelcomeScreen
+          lang={lang}
+          t={t}
+          onLang={changeLang}
+          onUpload={requestUpload}
+          onSample={loadSampleData}
+          onPrivacy={openPrivacy}
+          current={continueTarget()}
+          onContinue={continueToData}
+          onClear={clearData}
+        />
         {modals}
       </>
     );
@@ -1077,7 +1157,16 @@ export default function InventoryAssistant() {
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
+          <div
+            style={{ minWidth: 0, cursor: "pointer" }}
+            onClick={goHome}
+            role="link"
+            tabIndex={0}
+            title={t("home")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") goHome();
+            }}
+          >
             <div
               style={{
                 fontFamily: FONT_MONO,
@@ -1162,6 +1251,9 @@ export default function InventoryAssistant() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
+          <button onClick={goHome} style={chipButtonStyle} data-testid="home">
+            <Home size={11} /> {t("home")}
+          </button>
           <span style={chipStyle}>
             <FileSpreadsheet size={11} style={{ flexShrink: 0 }} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>

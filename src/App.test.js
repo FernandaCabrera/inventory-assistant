@@ -132,3 +132,50 @@ test("own file on the free plan: three rows of the order list, the rest behind t
   fireEvent.click(screen.getByText("Unlock the full list"));
   expect(screen.getByText("The full order list and its Excel download are part of the plan.")).toBeInTheDocument();
 });
+
+test("Home goes back to the first page and offers the way back to the loaded file", () => {
+  const items = [{ sku: "A1", name: "Cafe", warehouse: "Main", stock: 2, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3 }];
+  window.localStorage.setItem("mikardex.dataset", JSON.stringify({ source: "upload", fileName: "stock.xlsx", loadedAt: "2026-10-01T12:00:00.000Z", items }));
+  window.localStorage.setItem("mikardex.uploadsUsed", "1");
+  window.scrollTo = () => {};
+  render(<App />);
+
+  // opens straight into the loaded file
+  expect(screen.getByText(/stock.xlsx loaded, products: 1/)).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("home"));
+
+  // the home page, with its sections and the way back
+  expect(screen.getByText("How it works")).toBeInTheDocument();
+  expect(screen.getByText("Continue with stock.xlsx")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Replace data/ })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId("continue"));
+  expect(screen.getByText(/stock.xlsx loaded, products: 1/)).toBeInTheDocument();
+
+  // removing the data leaves a clean home page and an empty browser store
+  fireEvent.click(screen.getByTestId("home"));
+  window.confirm = () => true;
+  fireEvent.click(screen.getByText("Remove my data from this browser"));
+  expect(screen.queryByTestId("continue")).not.toBeInTheDocument();
+  expect(window.localStorage.getItem("mikardex.dataset")).toBeNull();
+  expect(screen.getByRole("button", { name: /Upload your Excel/ })).toBeInTheDocument();
+});
+
+test("after trying the sample, the home page still leads back to the visitor's own file", () => {
+  const items = [{ sku: "A1", name: "Cafe", warehouse: "Main", stock: 2, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3 }];
+  window.localStorage.setItem("mikardex.dataset", JSON.stringify({ source: "upload", fileName: "stock.xlsx", loadedAt: "2026-10-01T12:00:00.000Z", items }));
+  window.scrollTo = () => {};
+  jest.useFakeTimers();
+  render(<App />);
+  fireEvent.click(screen.getByTestId("home"));
+  fireEvent.click(screen.getByText("Try with sample data"));
+  act(() => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+  expect(screen.getByText(/Sample data loaded: 46 products/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId("home"));
+  fireEvent.click(screen.getByText("Continue with stock.xlsx"));
+  expect(screen.getByText(/stock.xlsx loaded, products: 1/)).toBeInTheDocument();
+});
