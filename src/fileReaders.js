@@ -1,45 +1,9 @@
-// Reads an .xlsx or .csv file in the browser and returns a grid of cells.
+// Reads an .xlsx or .csv file in the browser and returns its sheets as grids of cells.
 // The file never leaves the browser at this step.
 
-import ExcelJS from "exceljs/dist/exceljs.min.js";
+import ExcelJS from "exceljs/dist/exceljs.min.js"; // only used to write the template
 import { parseCsv } from "./importLogic";
-
-function cellValue(value) {
-  if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "object") {
-    if (Array.isArray(value.richText)) return value.richText.map((part) => part.text || "").join("");
-    if (value.result !== undefined) return cellValue(value.result);
-    if (value.text !== undefined) return cellValue(value.text);
-    if (value.error) return "";
-    return "";
-  }
-  return value;
-}
-
-async function readXlsx(buffer) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-  // the sheet with the most rows is the data; cover sheets are short
-  let sheet = null;
-  workbook.worksheets.forEach((ws) => {
-    if (!sheet || ws.actualRowCount > sheet.actualRowCount) sheet = ws;
-  });
-  if (!sheet) return [];
-
-  const grid = [];
-  sheet.eachRow({ includeEmpty: false }, (row) => {
-    const cells = [];
-    row.eachCell({ includeEmpty: true }, (cell, col) => {
-      cells[col - 1] = cellValue(cell.value);
-    });
-    for (let i = 0; i < cells.length; i += 1) {
-      if (cells[i] === undefined) cells[i] = "";
-    }
-    grid.push(cells);
-  });
-  return grid;
-}
+import { readXlsxSheets } from "./xlsxReader";
 
 function decodeText(buffer) {
   try {
@@ -50,18 +14,18 @@ function decodeText(buffer) {
   }
 }
 
-// Returns { grid } or throws an Error whose message is an i18n key.
-export async function readFileGrid(file) {
+// Returns { sheets: [{ name, grid }] } or throws an Error whose message is an i18n key.
+export async function readFileSheets(file) {
   const name = (file.name || "").toLowerCase();
   const buffer = await file.arrayBuffer();
 
   if (name.endsWith(".xls")) throw new Error("errOldXls");
   if (name.endsWith(".csv") || name.endsWith(".txt") || name.endsWith(".tsv")) {
-    return { grid: parseCsv(decodeText(buffer)) };
+    return { sheets: [{ name: file.name, grid: parseCsv(decodeText(buffer)) }] };
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xlsm")) {
     try {
-      return { grid: await readXlsx(buffer) };
+      return { sheets: await readXlsxSheets(buffer) };
     } catch (err) {
       throw new Error("errUnreadable");
     }

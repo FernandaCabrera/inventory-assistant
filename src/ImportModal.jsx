@@ -2,14 +2,16 @@ import { useRef, useState } from "react";
 import { Upload, Download, Loader2 } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, FONT_MONO, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
-import { FIELDS, extractTable, guessMapping, validateMapping, buildInventory } from "./importLogic";
-import { readFileGrid, downloadTemplate } from "./fileReaders";
+import { FIELDS, pickSheet, validateMapping, buildInventory } from "./importLogic";
+import { readFileSheets, downloadTemplate } from "./fileReaders";
 import { DEFAULT_SALES_PERIOD_DAYS, DEFAULT_LEAD_TIME_DAYS, MAX_ROWS } from "./config";
 
 export default function ImportModal({ lang, t, onClose, onImported }) {
   const [phase, setPhase] = useState("pick"); // pick | reading | map
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [sheetIndex, setSheetIndex] = useState(0);
   const [table, setTable] = useState(null);
   const [mapping, setMapping] = useState(null);
   const [period, setPeriod] = useState(DEFAULT_SALES_PERIOD_DAYS);
@@ -22,22 +24,31 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
     setError("");
     setPhase("reading");
     try {
-      const { grid } = await readFileGrid(file);
-      const parsed = extractTable(grid);
-      if (parsed.rows.length === 0) {
+      const { sheets } = await readFileSheets(file);
+      const picked = pickSheet(sheets);
+      if (picked.bestIndex < 0) {
         setError(t("errEmpty"));
         setPhase("pick");
         return;
       }
       setFileName(file.name);
-      setTable(parsed);
-      setMapping(guessMapping(parsed.headers));
+      setCandidates(picked.candidates);
+      setSheetIndex(picked.bestIndex);
+      setTable(picked.candidates[picked.bestIndex].table);
+      setMapping(picked.candidates[picked.bestIndex].mapping);
       setPhase("map");
     } catch (err) {
       const key = err && typeof err.message === "string" && err.message.startsWith("err") ? err.message : "errUnreadable";
       setError(t(key));
       setPhase("pick");
     }
+  }
+
+  function chooseSheet(index) {
+    setSheetIndex(index);
+    setTable(candidates[index].table);
+    setMapping(candidates[index].mapping);
+    setError("");
   }
 
   function analyze() {
@@ -127,6 +138,34 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {candidates.length > 1 && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                  paddingBottom: 10,
+                  marginBottom: 2,
+                  borderBottom: `1px solid ${COLORS.line}`,
+                }}
+              >
+                <span style={{ fontSize: 13.5, fontWeight: 600, flex: "1 1 190px" }}>{t("importSheet")}</span>
+                <select
+                  value={String(sheetIndex)}
+                  data-testid="sheet-select"
+                  onChange={(e) => chooseSheet(Number(e.target.value))}
+                  style={{ ...textInput, flex: "1 1 220px", width: "auto", padding: "8px 10px", fontSize: 13.5 }}
+                >
+                  {candidates.map((candidate, i) => (
+                    <option key={i} value={String(i)}>
+                      {candidate.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {FIELDS.map((field) => (
               <label
                 key={field}
