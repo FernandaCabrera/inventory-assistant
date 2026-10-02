@@ -48,14 +48,24 @@ const EXACT = {
 // "stock minimo" is the reorder point and "unidades vendidas" is sales, not stock.
 const LOOSE = [
   ["avg_daily_usage", /(diari|daily|por dia|per day)/, null],
-  ["reorder_point", /(reorden|reorder|punto de (pedido|reposicion)|\bmin(imo|imum)?\b)/, null],
+  [
+    "reorder_point",
+    /(reorden|reorder|punto de (pedido|reposicion)|\bmin(imo|imum)?\b)/,
+    // a minimum ORDER quantity is not a minimum stock
+    /(order qty|order quantity|\bmoq\b|pedido minimo|compra minima|min(imo|imum)? (order|purchase|compra|pedido)|reorder (qty|quantity))/,
+  ],
   ["lead_time_days", /(lead|reposicion|entrega|plazo|delivery)/, null],
   ["sales", /(vend|venta|sales|sold|salida|consumo|demand)/, /(precio|price|monto|amount|valor|revenue|ingreso|neto|bruto)/],
   ["unit_cost", /(costo|cost|precio (de )?(compra|costo)|purchase price)/, /total/],
   ["warehouse", /(bodega|almacen|sucursal|warehouse|location|ubicacion|tienda|store)/, null],
   ["sku", /(sku|codigo|code|\bcod\b|\bid\b|referencia|\bref\b|part number|barcode)/, null],
   ["name", /(nombre|descripcion|producto|name|description|product|articulo|item|detalle|glosa)/, null],
-  ["stock", /(stock|existencia|saldo|cantidad|qty|quantity|on hand|disponible|inventario|unidades|units|available)/, null],
+  [
+    "stock",
+    /(stock|existencia|saldo|cantidad|qty|quantity|on hand|disponible|inventario|unidades|units|available)/,
+    // safety stock, stock value, target stock, order quantities... are not the stock on hand
+    /(safety|seguridad|value|valor|target|objetivo|\bmin|\bmax|order|pedido|\bpo\b|\boc\b|stockout|quiebre|status|estado|date|fecha|days|dias)/,
+  ],
 ];
 
 // headers: array of strings -> { field: columnIndex | null }
@@ -228,6 +238,29 @@ export function extractTable(grid) {
     headers.push(label);
   }
   return { headers, rows: rows.slice(headerIndex + 1) };
+}
+
+// A workbook can have several sheets (instructions, dashboard, products, movements...).
+// Each sheet with data becomes a candidate; the best one is the sheet whose columns look
+// most like an inventory list. Returns { candidates: [{ name, table, mapping }], bestIndex }.
+export function pickSheet(sheets) {
+  const candidates = [];
+  sheets.forEach((sheet) => {
+    const table = extractTable(sheet.grid);
+    if (table.rows.length === 0) return;
+    const mapping = guessMapping(table.headers);
+    const score = Object.values(mapping).filter((v) => v !== null).length;
+    const ready = validateMapping(mapping).length === 0;
+    candidates.push({ name: sheet.name, table, mapping, score, ready });
+  });
+  let bestIndex = candidates.length > 0 ? 0 : -1;
+  candidates.forEach((candidate, i) => {
+    const best = candidates[bestIndex];
+    if ((candidate.ready && !best.ready) || (candidate.ready === best.ready && candidate.score > best.score)) {
+      bestIndex = i;
+    }
+  });
+  return { candidates, bestIndex };
 }
 
 // Returns the list of problems that block the import (empty = ready).

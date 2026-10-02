@@ -6,7 +6,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 
 ## What it does
 
-- **Bring your own spreadsheet** — upload an `.xlsx` or `.csv` export from Excel, Bsale, Shopify or similar. Columns are recognized in Spanish and English (and can be corrected by hand), title rows above the header are skipped, and Chilean (`1.234,5`) and English (`1,234.5`) number formats are both read. The file is parsed in the browser.
+- **Bring your own spreadsheet** — upload an `.xlsx` or `.csv` export from Excel, Bsale, Shopify or similar. In a workbook with several sheets the inventory sheet is picked automatically (and can be changed), columns are recognized in Spanish and English (and can be corrected by hand), title rows above the header are skipped, formulas are read from their saved values, and Chilean (`1.234,5`) and English (`1,234.5`) number formats are both read. The file is parsed in the browser.
 - **Works from what a small business has** — only product, stock and units sold in a period are needed. Daily usage, reorder point (usage × lead time × 1.5) and days of cover are calculated. A unit cost column adds inventory value and capital tied up.
 - **English and Spanish** — the interface follows the browser language and can be switched at any time; answers, reports and Excel exports come out in the same language.
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
@@ -21,7 +21,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 
 ## Tech stack
 
-- **Frontend:** React, Recharts (dashboard), ExcelJS (spreadsheet import and report export)
+- **Frontend:** React, Recharts (dashboard), JSZip with a small values-only reader (spreadsheet import), ExcelJS (report export)
 - **Backend:** Node.js, Express
 - **AI:** Anthropic Claude API (Sonnet), structured JSON output (narrative + action items + relevant charts)
 - **Email:** Resend, node-cron for scheduled checks
