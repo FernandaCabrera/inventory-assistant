@@ -22,6 +22,8 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
       ? t("planReasonDashboard")
       : reason === "orders"
       ? t("planReasonOrders")
+      : reason === "counts"
+      ? t("planReasonCounts")
       : "";
   const price = PLAN_PRICE[lang] || "";
 

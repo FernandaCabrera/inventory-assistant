@@ -380,6 +380,7 @@ const REASONS = {
   questions: "ran out of free questions",
   dashboard: "wanted the dashboard",
   orders: "wanted the full order list",
+  counts: "wanted the cycle count report in Excel",
 };
 
 app.post("/api/upgrade-request", async (req, res) => {

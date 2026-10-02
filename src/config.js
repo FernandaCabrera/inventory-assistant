@@ -30,6 +30,13 @@ export const ORDER_FREE_ROWS = 3; // rows of the order list shown without a plan
 export const COVER_DAYS_MIN = 1;
 export const COVER_DAYS_MAX = 365;
 
+// Cycle count report
+export const COUNT_MAX_LINES = 50000; // lines read from a count report
+export const COUNT_TABLE_ROWS = 10; // rows shown per table on screen (the Excel report has them all)
+export const DEFAULT_CYCLE_DAYS = 90; // every location should be counted at least this often
+// The report on screen is free. true = downloading it as Excel needs the plan.
+export const COUNT_EXPORT_NEEDS_PLAN = true;
+
 // Price shown in the plan window, per language, e.g. { es: "$19.990 al mes", en: "CAD $29 per month" }.
 // Leave empty to show no price.
 export const PLAN_PRICE = { es: "", en: "" };

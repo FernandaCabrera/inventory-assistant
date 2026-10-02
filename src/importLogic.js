@@ -107,7 +107,7 @@ export function guessMapping(headers) {
   return mapping;
 }
 
-// Accepts 1234.5, "1.234,5", "1,234.5", "$ 1.500", "(12)", "12 un"
+// Accepts 1234.5, "1.234,5", "1,234.5", "$ 1.500", "(12)", "12 un", and negatives written "-3", "−3" or "3-" (SAP)
 export function parseNumber(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (value === null || value === undefined) return null;
@@ -118,8 +118,8 @@ export function parseNumber(value) {
     negative = true;
     s = s.slice(1, -1);
   }
-  s = s.replace(/[^0-9.,-]/g, "");
-  if (s.startsWith("-")) {
+  s = s.replace(/[\u2212\u2012\u2013\u2014]/g, "-").replace(/[^0-9.,-]/g, "");
+  if (s.startsWith("-") || s.endsWith("-")) {
     negative = true;
   }
   s = s.replace(/-/g, "");
@@ -207,21 +207,24 @@ export function parseCsv(text) {
   return rows.filter((r) => r.some((c) => String(c).trim() !== ""));
 }
 
-function isBlank(value) {
+export function isBlank(value) {
   return value === null || value === undefined || String(value).trim() === "";
 }
 
 // Exports often have a title or blank rows above the real header.
-// Pick the row (among the first 20) where the most columns are recognized.
-export function extractTable(grid) {
+// Pick the row (among the first ones) where the most columns are recognized.
+// guess: the function that recognizes columns (inventory by default; cycle counts pass their own).
+// validate: when given, a row whose columns are enough to work with beats one that only has more matches.
+export function extractTable(grid, guess = guessMapping, scanRows = 20, validate = null) {
   const rows = grid.filter((r) => Array.isArray(r) && r.some((c) => !isBlank(c)));
   if (rows.length === 0) return { headers: [], rows: [] };
 
   let headerIndex = 0;
   let bestScore = -1;
-  rows.slice(0, 20).forEach((row, i) => {
-    const mapping = guessMapping(row.map((c) => String(c ?? "")));
-    const score = Object.values(mapping).filter((v) => v !== null).length;
+  rows.slice(0, scanRows).forEach((row, i) => {
+    const mapping = guess(row.map((c) => String(c ?? "")));
+    const found = Object.values(mapping).filter((v) => v !== null).length;
+    const score = found + (validate && validate(mapping).length === 0 ? 100 : 0);
     if (score > bestScore) {
       bestScore = score;
       headerIndex = i;
@@ -251,14 +254,16 @@ export function extractTable(grid) {
 // A workbook can have several sheets (instructions, dashboard, products, movements...).
 // Each sheet with data becomes a candidate; the best one is the sheet whose columns look
 // most like an inventory list. Returns { candidates: [{ name, table, mapping }], bestIndex }.
-export function pickSheet(sheets) {
+export function pickSheet(sheets, kind = {}) {
+  const guess = kind.guess || guessMapping;
+  const validate = kind.validate || validateMapping;
   const candidates = [];
   sheets.forEach((sheet) => {
-    const table = extractTable(sheet.grid);
+    const table = extractTable(sheet.grid, guess, kind.scanRows || 20, kind.validate || null);
     if (table.rows.length === 0) return;
-    const mapping = guessMapping(table.headers);
+    const mapping = guess(table.headers);
     const score = Object.values(mapping).filter((v) => v !== null).length;
-    const ready = validateMapping(mapping).length === 0;
+    const ready = validate(mapping).length === 0;
     candidates.push({ name: sheet.name, table, mapping, score, ready });
   });
   let bestIndex = candidates.length > 0 ? 0 : -1;
