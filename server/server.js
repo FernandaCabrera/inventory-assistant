@@ -8,8 +8,19 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Hosting platforms put a proxy in front of the app, so the visitor's address arrives in the
+// X-Forwarded-For header. Set TRUST_PROXY=false only if the server is exposed directly.
+app.set("trust proxy", process.env.TRUST_PROXY !== "false");
+
+// Set ALLOWED_ORIGINS (comma-separated) to accept browser calls only from your own sites,
+// e.g. ALLOWED_ORIGINS=https://inventory-assistant-theta.vercel.app,https://app.mikardex.cl
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(cors(allowedOrigins.length > 0 ? { origin: allowedOrigins } : undefined));
+app.use(express.json({ limit: "2mb" }));
 
 process.on("uncaughtException", (err) => {
   console.error("FATAL - uncaughtException:", err);
@@ -21,12 +32,76 @@ process.on("unhandledRejection", (err) => {
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const ALERT_RECIPIENT = "fcabrerar@micsh.cl";
-const ALERT_SENDER = "Inventory Assistant <onboarding@resend.dev>";
+const ALERT_RECIPIENT = process.env.ALERT_RECIPIENT || "fcabrerar@micsh.cl";
+const ALERT_SENDER = process.env.ALERT_SENDER || "Inventory Assistant <onboarding@resend.dev>";
+// Where plan requests from the app are sent
+const LEADS_RECIPIENT = process.env.LEADS_RECIPIENT || ALERT_RECIPIENT;
 
-const SYSTEM_PROMPT = `You are a senior inventory planning analyst for a food manufacturing company.
-You are advising an operations manager who needs clear, decision-ready answers — not raw data dumps.
+// ---- PLANS AND LIMITS ----
+// The paid plan is unlocked with an access code. Codes live in the ACCESS_CODES environment
+// variable, comma-separated (ACCESS_CODES=CAFE-2291,TIENDA-8840). Remove a code to switch it off.
+function normalizeCode(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+const ACCESS_CODES = new Set((process.env.ACCESS_CODES || "").split(",").map(normalizeCode).filter(Boolean));
+
+function intEnv(name, fallback) {
+  const n = parseInt(process.env[name], 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+const LIMITS = {
+  // questions per day from one network address without a code (the app itself stops at 3 per browser)
+  freePerIp: intEnv("FREE_DAILY_QUESTIONS_PER_IP", 10),
+  // questions per day for one access code
+  plan: intEnv("PLAN_DAILY_QUESTIONS", 100),
+  // questions per day across everyone: the ceiling on what the AI can cost in a day
+  global: intEnv("GLOBAL_DAILY_QUESTIONS", 200),
+  codeFailuresPerIp: 20,
+  requestsPerIp: 5,
+};
+
+// SKUs sent to the AI per question. Larger inventories send the most urgent ones first.
+const MAX_ITEMS_FOR_AI = intEnv("MAX_ITEMS_FOR_AI", 800);
+
+// Daily counters, kept in memory: they reset at 00:00 UTC and when the server restarts.
+const counters = { day: "", counts: new Map() };
+
+function rollDay() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (counters.day !== today) {
+    counters.day = today;
+    counters.counts = new Map();
+  }
+}
+
+function used(key) {
+  rollDay();
+  return counters.counts.get(key) || 0;
+}
+
+function take(key, max) {
+  const current = used(key);
+  if (current >= max) return false;
+  counters.counts.set(key, current + 1);
+  return true;
+}
+
+const SYSTEM_PROMPT = `You are a senior inventory planning analyst advising the owner or operations manager of a small or
+mid-sized business. They need clear, decision-ready answers — not raw data dumps.
 You will be given the current inventory dataset as JSON and a question.
+
+THE DATA:
+- Each record has: sku, name, warehouse, stock (units on hand), reorder_point, lead_time_days,
+  avg_daily_usage (units per day, from recent sales) and sometimes unit_cost (cost per unit, in the
+  business's own currency).
+- A field that is missing from a record is unknown — say so rather than assuming a value.
+- avg_daily_usage of 0 with stock above 0 means the product did not sell in the period: that stock is
+  capital tied up. Never recommend reordering it; recommend what to do with it (hold purchases, promote,
+  bundle, liquidate).
+- When unit_cost is present, quantify money where it helps the decision (stock x unit_cost). When it is
+  absent, say that value cannot be calculated without a unit cost column.
 
 DATA DISCIPLINE:
 - Answer only using information derived from the dataset — never invent SKUs, quantities, or dates.
@@ -36,6 +111,8 @@ DATA DISCIPLINE:
   outside what you can help with here, and redirect to what you can do — do not attempt to answer it anyway.
 - If the dataset is too thin to support real confidence (e.g. no historical trend, no seasonality data),
   say so rather than presenting a recommendation with more certainty than the data actually supports.
+- If a note says only part of the inventory is included, base totals on the summary in that note and say
+  that the detail covers the most urgent SKUs.
 
 HOW TO ANALYZE:
 - When asked about stockouts or reorder status, compare "stock" against "reorder_point" for every relevant SKU.
@@ -53,7 +130,8 @@ HOW TO RECOMMEND:
 - If nothing is urgent, say so plainly and briefly.
 
 STYLE (for the "narrative" field):
-- Detect the language of the question and respond in the same language.
+- Detect the language of the question (Spanish or English) and respond in that same language. Everything
+  you write — narrative, section headings, issues and recommended actions — is in that language.
 - Write like an experienced analyst briefing a manager: direct, concise, no filler.
 - Do NOT use markdown headers (#), tables, or bullet symbols (-, *) at the start of lines.
 - You MAY wrap the single most important conclusion or figure in double asterisks like **this** — sparingly.
@@ -63,6 +141,8 @@ STYLE (for the "narrative" field):
   its own line and ending with a colon, still with no markdown symbols:
   "Executive Summary:", "Stock Status Overview:", "Reorder Actions Required:",
   "Excess & Slow-Moving Inventory:", "Recommendations:"
+  (in Spanish: "Resumen ejecutivo:", "Estado general del stock:", "Acciones de reposición requeridas:",
+  "Inventario en exceso y de baja rotación:", "Recomendaciones:")
   Keep each section tight — this is a report a manager reads in 2 minutes before a meeting, not a document
   they study for 20.
 
@@ -79,13 +159,14 @@ OUTPUT FORMAT — respond with ONLY valid JSON, no other text, no markdown code 
   ],
   "relevant_charts": ["status_overview" | "days_of_cover" | "warehouse_distribution"]
 }
+The "priority" value is always one of those four English words, whatever the language of the answer.
 Only include entries in action_items for SKUs that actually need action given the question asked. If the
 question doesn't naturally produce SKU-level actions (e.g. a general question with no flagged items), return
 an empty array for action_items — do not force irrelevant rows.
 
 For relevant_charts, pick only the charts that actually help answer THIS question — do not default to all three:
-- "status_overview": a bar count of SKUs by status (critical/low/ok/excess) — use for broad status questions
-  and full reports.
+- "status_overview": a bar count of SKUs by status (critical/low/ok/no sales/excess) — use for broad status
+  questions and full reports.
 - "days_of_cover": days of cover per SKU, ranked — use for reorder/stockout/urgency questions.
 - "warehouse_distribution": total units per warehouse — use for questions about warehouse balance or
   where stock is concentrated.
@@ -126,19 +207,95 @@ function sanitizeInventory(inventory) {
   });
 }
 
+// Second layer: only the fields the analysis uses go to the AI, whatever the browser sent.
+const ITEM_FIELDS = ["sku", "name", "warehouse", "stock", "reorder_point", "lead_time_days", "avg_daily_usage", "unit_cost"];
+
+function compactItem(item) {
+  const out = {};
+  for (const key of ITEM_FIELDS) {
+    const value = item[key];
+    if (typeof value === "string" && value !== "") out[key] = value.slice(0, 120);
+    else if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+  }
+  return out;
+}
+
+function statusFor(item) {
+  const stock = Math.max(0, Number(item.stock) || 0);
+  const usage = typeof item.avg_daily_usage === "number" ? item.avg_daily_usage : null;
+  const reorder = typeof item.reorder_point === "number" ? item.reorder_point : null;
+  if (usage !== null && usage <= 0) return stock > 0 ? "idle" : "ok";
+  if (reorder !== null && reorder > 0) {
+    const ratio = stock / reorder;
+    if (ratio < 0.5) return "critical";
+    if (ratio < 1) return "low";
+    if (ratio > 3) return "excess";
+  }
+  return "ok";
+}
+
+const URGENCY = { critical: 0, low: 1, idle: 2, excess: 3, ok: 4 };
+
+function prepareInventory(inventory) {
+  const clean = sanitizeInventory(inventory.filter((item) => item && typeof item === "object" && !Array.isArray(item)))
+    .map(compactItem)
+    .filter((item) => item.sku !== undefined || item.name !== undefined);
+
+  if (clean.length <= MAX_ITEMS_FOR_AI) return { items: clean, note: "" };
+
+  const counts = { critical: 0, low: 0, ok: 0, idle: 0, excess: 0 };
+  let units = 0;
+  const ranked = clean.map((item, index) => {
+    const status = statusFor(item);
+    counts[status] += 1;
+    units += Math.max(0, Number(item.stock) || 0);
+    return { item, index, rank: URGENCY[status] };
+  });
+  ranked.sort((a, b) => a.rank - b.rank || a.index - b.index);
+
+  const note =
+    `NOTE: this inventory has ${clean.length} SKUs. Only the ${MAX_ITEMS_FOR_AI} most urgent are listed below ` +
+    `(critical first, then low, no sales, excess, ok). Whole-inventory summary: ${counts.critical} critical, ` +
+    `${counts.low} low, ${counts.idle} with no sales, ${counts.excess} excess, ${counts.ok} ok; ${units} units in total.\n\n`;
+  return { items: ranked.slice(0, MAX_ITEMS_FOR_AI).map((r) => r.item), note };
+}
+
 app.post("/api/ask", async (req, res) => {
+  const body = req.body || {};
+  const question = typeof body.question === "string" ? body.question.trim() : "";
+  if (!question || question.length > 2000 || !Array.isArray(body.inventory) || body.inventory.length === 0) {
+    return res.status(400).json({ error: "bad_request" });
+  }
+
+  const ip = req.ip || "unknown";
+  const code = normalizeCode(body.code);
+  const hasPlan = code !== "" && ACCESS_CODES.has(code);
+
+  if (used("global") >= LIMITS.global) {
+    console.warn(`[LIMIT] global daily limit reached (${LIMITS.global})`);
+    return res.status(429).json({ error: "limit", scope: "global" });
+  }
+  const allowed = hasPlan ? take(`plan:${code}`, LIMITS.plan) : take(`free:${ip}`, LIMITS.freePerIp);
+  if (!allowed) {
+    return res.status(429).json({ error: "limit", scope: hasPlan ? "plan" : "free" });
+  }
+  take("global", LIMITS.global);
+
   try {
-    const { question, inventory, history } = req.body;
-    const safeInventory = sanitizeInventory(inventory);
+    const { items, note } = prepareInventory(body.inventory);
+    console.log(`[ASK] ${hasPlan ? "plan" : "free"} skus=${body.inventory.length} sent=${items.length} today=${used("global")}`);
 
     // Reconstruct prior turns as plain alternating user/assistant messages.
     // The dataset is re-attached only to the CURRENT question, so every call
     // always reasons over fresh data while still remembering prior exchanges.
-    const priorTurns = Array.isArray(history)
-      ? history.slice(-6).map((h) => ({
-          role: h.role === "user" ? "user" : "assistant",
-          content: h.text,
-        }))
+    const priorTurns = Array.isArray(body.history)
+      ? body.history
+          .slice(-6)
+          .filter((h) => h && typeof h.text === "string" && h.text.trim() !== "")
+          .map((h) => ({
+            role: h.role === "user" ? "user" : "assistant",
+            content: h.text.slice(0, 6000),
+          }))
       : [];
 
     const response = await anthropic.messages.create({
@@ -149,7 +306,7 @@ app.post("/api/ask", async (req, res) => {
         ...priorTurns,
         {
           role: "user",
-          content: `INVENTORY DATASET:\n${JSON.stringify(safeInventory)}\n\nQUESTION: ${question}`,
+          content: `${note}INVENTORY DATASET:\n${JSON.stringify(items)}\n\nQUESTION: ${question}`,
         },
       ],
     });
@@ -183,20 +340,90 @@ app.get("/api/system-prompt", (req, res) => {
   res.json({ prompt: SYSTEM_PROMPT });
 });
 
+// ---- ACCESS CODES ----
+
+app.post("/api/validate-code", (req, res) => {
+  const ip = req.ip || "unknown";
+  if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) {
+    return res.status(429).json({ valid: false, error: "limit" });
+  }
+  const code = normalizeCode(req.body && req.body.code);
+  const valid = code !== "" && ACCESS_CODES.has(code);
+  if (!valid) take(`codefail:${ip}`, LIMITS.codeFailuresPerIp);
+  res.json({ valid });
+});
+
+// ---- PLAN REQUESTS ----
+// Someone in the app asked for the paid plan: email it to the owner.
+
+function escapeHTML(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const REASONS = { upload: "wanted to load another file", questions: "ran out of free questions", dashboard: "wanted the dashboard" };
+
+app.post("/api/upgrade-request", async (req, res) => {
+  const body = req.body || {};
+  const email = typeof body.email === "string" ? body.email.trim().slice(0, 200) : "";
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
+  const lang = body.lang === "es" ? "es" : "en";
+  const skuCount = Number.isFinite(Number(body.skuCount)) ? Math.max(0, Math.round(Number(body.skuCount))) : 0;
+  const reason = REASONS[body.reason] || "opened the plan";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ ok: false, error: "email" });
+  }
+  const ip = req.ip || "unknown";
+  if (!take(`request:${ip}`, LIMITS.requestsPerIp)) {
+    return res.status(429).json({ ok: false, error: "limit" });
+  }
+
+  // The log line is the backup copy if the email cannot be delivered.
+  console.log(`[PLAN REQUEST] ${email} | lang=${lang} | skus=${skuCount} | ${reason} | ${note}`);
+
+  try {
+    const { error } = await resend.emails.send({
+      from: ALERT_SENDER,
+      to: LEADS_RECIPIENT,
+      replyTo: email,
+      subject: `MiKardex: plan request from ${email}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
+          <div style="background:#15181A;color:#F4F1EA;padding:16px 20px;border-radius:10px 10px 0 0;">
+            <h2 style="margin:0;font-size:16px;">New plan request</h2>
+          </div>
+          <div style="border:1px solid #DADFD7;border-top:none;border-radius:0 0 10px 10px;padding:16px 20px;font-size:14px;color:#15181A;line-height:1.6;">
+            <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHTML(email)}</p>
+            <p style="margin:0 0 8px;"><strong>Language:</strong> ${lang === "es" ? "Spanish" : "English"}</p>
+            <p style="margin:0 0 8px;"><strong>Products loaded:</strong> ${skuCount || "sample data only"}</p>
+            <p style="margin:0 0 8px;"><strong>What happened:</strong> ${escapeHTML(reason)}</p>
+            <p style="margin:0 0 8px;"><strong>Their note:</strong> ${note ? escapeHTML(note) : "—"}</p>
+            <p style="font-size:12px;color:#6B7268;margin:14px 0 0;">Reply to this email to write to them directly.</p>
+          </div>
+        </div>`,
+    });
+    if (error) {
+      console.error("Plan request email failed:", error);
+      return res.status(502).json({ ok: false, error: "send" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Plan request email failed:", err);
+    res.status(502).json({ ok: false, error: "send" });
+  }
+});
+
 // ---- EMAIL ALERTS ----
 
 function loadInventory() {
   const filePath = path.join(__dirname, "..", "src", "data", "inventory.json");
   const raw = fs.readFileSync(filePath, "utf8");
   return JSON.parse(raw);
-}
-
-function statusFor(item) {
-  const ratio = item.stock / item.reorder_point;
-  if (ratio < 0.5) return "critical";
-  if (ratio < 1) return "low";
-  if (ratio > 3) return "excess";
-  return "ok";
 }
 
 function buildAlertHTML(criticalItems) {
@@ -277,17 +504,36 @@ async function checkInventoryAndAlert(triggeredManually = false) {
 
 // Manual trigger endpoint — lets you test without waiting for the cron schedule
 app.post("/api/send-alert", async (req, res) => {
+  if (!take(`alert:${req.ip || "unknown"}`, 10)) {
+    return res.status(429).json({ sent: false, reason: "Daily limit for manual alerts reached." });
+  }
   const result = await checkInventoryAndAlert(true);
   res.json(result);
 });
 
-// Cron: runs every 5 minutes for today's demo.
-// For production, change to daily: "0 8 * * *" (8:00 AM every day)
-cron.schedule("*/5 * * * *", () => {
+// Cron: daily at 8:00 AM (server time) on the sample dataset.
+// For a live demo, set ALERT_CRON="*/5 * * * *" to run every 5 minutes.
+// The alert and the plan requests share one Resend account, so a 5-minute schedule
+// left on in production can use up the daily email allowance.
+const ALERT_CRON = cron.validate(process.env.ALERT_CRON || "") ? process.env.ALERT_CRON : "0 8 * * *";
+cron.schedule(ALERT_CRON, () => {
   checkInventoryAndAlert(false);
 });
 
-console.log("Email alert cron scheduled: every 5 minutes (demo mode).");
+console.log(`Email alert cron scheduled: ${ALERT_CRON}`);
+
+// Malformed or oversized requests get a short JSON answer instead of a stack trace.
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.too.large") return res.status(413).json({ error: "too_large" });
+  if (err instanceof SyntaxError) return res.status(400).json({ error: "bad_json" });
+  console.error(err);
+  res.status(500).json({ error: "server" });
+});
+
+console.log(
+  `Plans: ${ACCESS_CODES.size} access code(s) loaded. Daily limits: ${LIMITS.freePerIp} free per address, ` +
+    `${LIMITS.plan} per code, ${LIMITS.global} in total.`
+);
 
 const PORT = 4001;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
