@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import App from "./App";
 
 jest.mock("recharts", () => {
@@ -222,4 +222,65 @@ test("the cycle count example shows its conclusions and stays in the browser", (
   expect(screen.getByTestId("count-total")).toHaveValue(600);
   expect(screen.getByText(/of 600 locations were counted/)).toBeInTheDocument();
   expect(screen.getByText(/The first is Interfold paper towel x20/)).toBeInTheDocument();
+});
+
+test("the count report says where to count: cycle, filter and areas", () => {
+  window.scrollTo = () => {};
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByTestId("counts-sample"));
+
+  // the cycle is set at the top of the report, in days and months
+  expect(screen.getByText("Ciclo de conteo:")).toBeInTheDocument();
+  expect(screen.getByTestId("count-cycle")).toHaveValue("60");
+  expect(screen.getByText("Dónde contar: ubicaciones fuera del ciclo de 60 días, por zona")).toBeInTheDocument();
+
+  // only what is outside the cycle, then one area of it
+  fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "outside" } });
+  const outside = Number(/Coincidencias: (\d+)/.exec(screen.getByTestId("count-last-matches").textContent)[1]);
+  expect(outside).toBeGreaterThan(50);
+  expect(screen.getByTestId("count-last-rows")).not.toHaveTextContent("Dentro del ciclo");
+  const firstArea = within(screen.getByTestId("count-last-zones")).getAllByRole("button")[0];
+  const inArea = Number(/· (\d+)/.exec(firstArea.textContent)[1]);
+  fireEvent.click(firstArea);
+  expect(firstArea).toHaveAttribute("aria-pressed", "true");
+  expect(inArea).toBeLessThan(outside);
+
+  // by the month of the last count
+  fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "2026-06" } });
+  expect(screen.getByTestId("count-last-matches")).toHaveTextContent(/Coincidencias: \d+/);
+  expect(screen.getByTestId("count-last-rows")).toHaveTextContent("jun 2026");
+  expect(screen.getByTestId("count-last-rows")).not.toHaveTextContent("jul 2026");
+
+  // a longer cycle leaves nothing outside it in a three-month example
+  fireEvent.change(screen.getByTestId("count-cycle"), { target: { value: "90" } });
+  fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "outside" } });
+  expect(screen.getByTestId("count-last-matches")).toHaveTextContent("Nada coincide con esa búsqueda.");
+});
+
+test("the dashboard has the cycle counts, and the way to the report and back", () => {
+  window.scrollTo = () => {};
+  jest.useFakeTimers();
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByText("Probar con datos de ejemplo"));
+  act(() => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+  fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
+
+  // nothing loaded yet: the dashboard asks for the count report
+  expect(screen.getByTestId("dash-counts")).toHaveTextContent("Sube tu reporte de conteos para ver aquí qué parte de la bodega toca contar.");
+  fireEvent.click(screen.getByRole("button", { name: /Ver un ejemplo/ }));
+  expect(screen.getByTestId("cycle-counts")).toBeInTheDocument();
+
+  // back in the dashboard, the same figures as the report
+  fireEvent.click(screen.getByTestId("count-back"));
+  const block = screen.getByTestId("dash-counts");
+  expect(block).toHaveTextContent("Dentro del ciclo");
+  expect(block).toHaveTextContent("Fuera del ciclo");
+  expect(block).toHaveTextContent("Dónde contar: ubicaciones fuera del ciclo de 60 días, por zona");
+  fireEvent.click(screen.getByTestId("dash-counts-open"));
+  expect(screen.getByTestId("count-conclusions")).toBeInTheDocument();
 });

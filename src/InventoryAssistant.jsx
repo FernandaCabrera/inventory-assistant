@@ -48,6 +48,7 @@ import { buildOrderList, runningOutFirst } from "./orderLogic";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import CountImportModal from "./CountImportModal";
 import CycleCounts from "./CycleCounts";
+import CountSnapshot from "./CountSnapshot";
 import { pickSheet } from "./importLogic";
 import { guessCountMapping, validateCountMapping, buildCountLines } from "./countLogic";
 import { sampleCountGrid, SAMPLE_COUNT_TOTAL_LOCATIONS, SAMPLE_COUNT_FILE } from "./data/sampleCounts";
@@ -172,7 +173,8 @@ function StatusStamp({ status, t }) {
   );
 }
 
-function Dashboard({ items, lang, t }) {
+// children: an extra block shown under the key figures (the cycle counts)
+function Dashboard({ items, lang, t, children }) {
   const isMobile = useIsMobile();
   const summary = useMemo(() => summarize(items), [items]);
 
@@ -223,6 +225,8 @@ function Dashboard({ items, lang, t }) {
       ) : (
         <div style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5 }}>{t("noCostNote")}</div>
       )}
+
+      {children}
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <ChartCard title={t("chartStatus")}>
@@ -812,7 +816,8 @@ export default function InventoryAssistant() {
 
   function loadSampleCounts() {
     setCounts(sampleCounts(lang));
-    setCountInputs({ total: String(SAMPLE_COUNT_TOTAL_LOCATIONS), counted: "", cycle: null });
+    // a two-month cycle, so the example has locations on both sides of it
+    setCountInputs({ total: String(SAMPLE_COUNT_TOTAL_LOCATIONS), counted: "", cycle: 60 });
     setShowCounts(true);
     window.scrollTo(0, 0);
   }
@@ -1166,6 +1171,7 @@ export default function InventoryAssistant() {
             t={t}
             paid={paid}
             onHome={goHome}
+            onBack={hasEntered ? () => setShowCounts(false) : null}
             onReplace={openCountImport}
             onUpgrade={setUpgradeReason}
           />
@@ -1394,7 +1400,20 @@ export default function InventoryAssistant() {
                   </button>
                 </div>
               )}
-              <Dashboard items={items} lang={lang} t={t} />
+              <Dashboard items={items} lang={lang} t={t}>
+                <CountSnapshot
+                  counts={counts}
+                  inputs={countInputs}
+                  lang={lang}
+                  t={t}
+                  onOpen={() => {
+                    setShowCounts(true);
+                    window.scrollTo(0, 0);
+                  }}
+                  onUpload={openCountImport}
+                  onSample={loadSampleCounts}
+                />
+              </Dashboard>
             </>
           )
         ) : (
