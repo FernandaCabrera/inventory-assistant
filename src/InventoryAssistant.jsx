@@ -34,10 +34,14 @@ import {
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
 import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, tiedUpValue, summarize, toNumber } from "./inventoryLogic";
-import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT } from "./config";
+import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
 import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
 import UpgradeModal from "./UpgradeModal";
+import OrderList from "./OrderList";
+import SummaryCards from "./SummaryCards";
+import { HomeSections, Footer, PrivacyModal } from "./HomeSections";
+import { buildOrderList, runningOutFirst } from "./orderLogic";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4001";
 
@@ -531,19 +535,14 @@ function playScanBeep() {
   }
 }
 
-function WelcomeScreen({ lang, t, onLang, onUpload, onSample }) {
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy }) {
   return (
     <div
       style={{
         fontFamily: FONT_BODY,
         background: COLORS.bg,
         minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px 16px",
-        textAlign: "center",
+        padding: "24px 16px 28px",
         position: "relative",
         boxSizing: "border-box",
       }}
@@ -551,6 +550,19 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample }) {
       <div style={{ position: "absolute", top: 18, right: 18 }}>
         <LanguageToggle lang={lang} onChange={onLang} />
       </div>
+
+      {/* The first screen: what it is and the two ways in */}
+      <div
+        style={{
+          minHeight: "min(84vh, 760px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          paddingBottom: 28,
+        }}
+      >
 
       <div
         style={{
@@ -613,6 +625,10 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample }) {
         {t("freeNote", { uploads: FREE_UPLOADS, questions: FREE_QUESTIONS })}
       </p>
       <p style={{ fontSize: 12.5, color: COLORS.inkMuted, maxWidth: 440, lineHeight: 1.55, margin: 0 }}>{t("privacy")}</p>
+      </div>
+
+      <HomeSections t={t} onPrivacy={onPrivacy} />
+      <Footer t={t} onPrivacy={onPrivacy} />
     </div>
   );
 }
@@ -689,12 +705,16 @@ export default function InventoryAssistant() {
   const [exportingIndex, setExportingIndex] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState(null); // null = closed
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [coverDays, setCoverDays] = useState(() => String(load("coverDays", ORDER_COVER_DAYS)));
   const scrollRef = useRef(null);
 
   const items = useMemo(() => (dataset ? dataset.items : []), [dataset]);
   const summary = useMemo(() => summarize(items), [items]);
   const isSample = !dataset || dataset.source === "sample";
   const dashboardLocked = !isSample && !paid;
+  const orderList = useMemo(() => buildOrderList(items, coverDays), [items, coverDays]);
+  const runOut = useMemo(() => runningOutFirst(items, 3), [items]);
   const questionsLeft = paid ? Infinity : Math.max(0, FREE_QUESTIONS - questionsUsed);
 
   useEffect(() => {
@@ -705,6 +725,12 @@ export default function InventoryAssistant() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
+
+  // Wake the server as soon as the page opens: on a sleeping host the first request takes about
+  // a minute, and this way it is ready by the time the visitor has loaded a file and asks something.
+  useEffect(() => {
+    fetch(`${API_URL}/api/health`).catch(() => {});
+  }, []);
 
   // A stored code is checked once per visit; a code that was withdrawn stops unlocking.
   useEffect(() => {
@@ -792,6 +818,14 @@ export default function InventoryAssistant() {
 
   const closeImport = useCallback(() => setShowImport(false), []);
   const closeUpgrade = useCallback(() => setUpgradeReason(null), []);
+  const openPrivacy = useCallback(() => setShowPrivacy(true), []);
+  const closePrivacy = useCallback(() => setShowPrivacy(false), []);
+
+  function changeCoverDays(value) {
+    setCoverDays(value);
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 1 && n <= 365) save("coverDays", Math.round(n));
+  }
 
   function handleActivated(code) {
     const clean = code.trim().toUpperCase();
@@ -1005,6 +1039,7 @@ export default function InventoryAssistant() {
           onActivated={handleActivated}
         />
       )}
+      {showPrivacy && <PrivacyModal t={t} onClose={closePrivacy} />}
     </>
   );
 
@@ -1012,7 +1047,7 @@ export default function InventoryAssistant() {
     return (
       <>
         <GlobalStyles />
-        <WelcomeScreen lang={lang} t={t} onLang={changeLang} onUpload={requestUpload} onSample={loadSampleData} />
+        <WelcomeScreen lang={lang} t={t} onLang={changeLang} onUpload={requestUpload} onSample={loadSampleData} onPrivacy={openPrivacy} />
         {modals}
       </>
     );
@@ -1082,6 +1117,7 @@ export default function InventoryAssistant() {
         <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.line}` }}>
           {[
             { key: "assistant", label: t("tabAssistant") },
+            { key: "orders", label: t("tabOrders"), count: orderList.rows.length },
             { key: "dashboard", label: t("tabDashboard") },
           ].map((tab) => (
             <button
@@ -1106,6 +1142,20 @@ export default function InventoryAssistant() {
               }}
             >
               {tab.label}
+              {tab.count > 0 && (
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    background: COLORS.critical,
+                    color: "#FFFFFF",
+                    borderRadius: 9,
+                    padding: "1px 7px",
+                    letterSpacing: 0,
+                  }}
+                >
+                  {tab.count}
+                </span>
+              )}
               {tab.key === "dashboard" && dashboardLocked && <Lock size={11} />}
             </button>
           ))}
@@ -1165,7 +1215,42 @@ export default function InventoryAssistant() {
           </pre>
         )}
 
-        {view === "dashboard" ? (
+        {view === "orders" ? (
+          <>
+            {isSample && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  background: COLORS.surface,
+                  border: `1px solid ${COLORS.line}`,
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  fontSize: 13.5,
+                  color: COLORS.ink,
+                }}
+              >
+                {t("sampleBanner")}
+                <button onClick={requestUpload} style={{ ...primaryButton, padding: "8px 14px", fontSize: 11.5 }}>
+                  <Upload size={13} /> {t("uploadExcel")}
+                </button>
+              </div>
+            )}
+            <OrderList
+              list={orderList}
+              lang={lang}
+              t={t}
+              locked={dashboardLocked}
+              coverDays={coverDays}
+              onCoverDays={changeCoverDays}
+              onUnlock={() => setUpgradeReason("orders")}
+            />
+          </>
+        ) : view === "dashboard" ? (
           dashboardLocked ? (
             <LockedDashboard summary={summary} lang={lang} t={t} onUnlock={() => setUpgradeReason("dashboard")} />
           ) : (
@@ -1197,6 +1282,17 @@ export default function InventoryAssistant() {
             </>
           )
         ) : (
+          <>
+          <SummaryCards
+            runOut={runOut}
+            orders={orderList}
+            summary={summary}
+            moneyVisible={!dashboardLocked}
+            lang={lang}
+            t={t}
+            onOpenOrders={() => setView("orders")}
+            onOpenDashboard={() => setView("dashboard")}
+          />
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 320px", gap: 20 }}>
             {/* Chat panel */}
             <div
@@ -1430,7 +1526,9 @@ export default function InventoryAssistant() {
               )}
             </div>
           </div>
+          </>
         )}
+        <Footer t={t} onPrivacy={openPrivacy} />
       </div>
       {modals}
     </div>

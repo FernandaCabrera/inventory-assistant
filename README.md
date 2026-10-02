@@ -8,11 +8,13 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 
 - **Bring your own spreadsheet** — upload an `.xlsx` or `.csv` export from Excel, Bsale, Shopify or similar. In a workbook with several sheets the inventory sheet is picked automatically (and can be changed), columns are recognized in Spanish and English (and can be corrected by hand), title rows above the header are skipped, formulas are read from their saved values, and Chilean (`1.234,5`) and English (`1,234.5`) number formats are both read. The file is parsed in the browser.
 - **Works from what a small business has** — only product, stock and units sold in a period are needed. Daily usage, reorder point (usage × lead time × 1.5) and days of cover are calculated. A unit cost column adds inventory value and capital tied up.
+- **Order list** — what to order today and how much, per product, counting units already on order: quantity = reorder point + the days of sales to cover − stock − units on order. Plain arithmetic in the browser, no AI call. Flags products that will run out before a new order arrives, and downloads as an Excel file to send to suppliers.
+- **Summary on load** — right after a file loads, three cards say what runs out first, how many products need an order, and how much stock is not moving. No question needed.
 - **English and Spanish** — the interface follows the browser language and can be switched at any time; answers, reports and Excel exports come out in the same language.
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
 - **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000.
-- **Free tier and paid plan** — without a plan: one file, three questions, and the dashboard shown locked. An access code unlocks the dashboard, new uploads and more questions. Visitors can request the plan from the app; the request is emailed to the owner.
+- **Free tier and paid plan** — without a plan: one file, three questions, the first three rows of the order list, and the dashboard shown locked. An access code unlocks the full order list with its Excel download, the dashboard, new uploads and more questions. Visitors can request the plan from the app; the request is emailed to the owner.
 - **Usage limits** — daily caps per visitor, per access code and in total keep the AI bill bounded.
 - **Excel export** — every answer can be exported as a formatted workbook with a narrative report sheet and a color-coded action plan table.
 - **Automated email alerts** — a scheduled job checks the sample dataset and emails a formatted alert whenever SKUs fall below their reorder point.
@@ -87,6 +89,10 @@ npm test
 |---|---|---|
 | Free files per browser | `src/config.js` → `FREE_UPLOADS` | 1 |
 | Free questions per browser | `src/config.js` → `FREE_QUESTIONS` | 3 |
+| Order list rows shown without a plan | `src/config.js` → `ORDER_FREE_ROWS` | 3 |
+| Days of sales a new order should cover | `src/config.js` → `ORDER_COVER_DAYS` (visitors can change it) | 30 |
+| Price shown in the plan window, per language | `src/config.js` → `PLAN_PRICE` | none |
+| Name and LinkedIn shown under "Who is behind it" | `src/config.js` → `OWNER_NAME`, `OWNER_LINKEDIN` | — |
 | Access codes for the paid plan | server env `ACCESS_CODES` (comma-separated) | none |
 | Questions per day without a code, per network address | server env `FREE_DAILY_QUESTIONS_PER_IP` | 10 |
 | Questions per day per access code | server env `PLAN_DAILY_QUESTIONS` | 100 |
@@ -103,6 +109,10 @@ What these limits are and are not:
 - Daily counters are held in memory, so they reset at 00:00 UTC and whenever the server restarts.
 - A real paywall (accounts, stored inventories, online payment) is the next step once people are asking for the plan.
 - Also set a monthly spend limit in the Anthropic Console as a last line of defense.
+
+## Home page and privacy notice
+
+The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, accounts, analytics).
 
 ## Sample dataset
 

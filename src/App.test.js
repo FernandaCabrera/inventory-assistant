@@ -18,11 +18,13 @@ beforeEach(() => {
 
 test("welcome screen offers upload and sample data, in both languages", () => {
   render(<App />);
-  expect(screen.getByText("Upload your Excel")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Upload your Excel/ })).toBeInTheDocument();
   expect(screen.getByText("Try with sample data")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "ES" }));
-  expect(screen.getByText("Sube tu Excel")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
+  expect(screen.getByText("Quién está detrás")).toBeInTheDocument();
+  expect(screen.getByText(/99,99% de exactitud de inventario/)).toBeInTheDocument();
   expect(screen.getByText("Pregúntale a tu inventario")).toBeInTheDocument();
 });
 
@@ -79,4 +81,54 @@ test("the AI prompt is not shown to visitors", () => {
   jest.useRealTimers();
   expect(screen.getByText("New conversation")).toBeInTheDocument();
   expect(screen.queryByText("View prompt")).not.toBeInTheDocument();
+});
+
+test("privacy notice opens from the home page", () => {
+  render(<App />);
+  fireEvent.click(screen.getAllByText("Privacy notice")[0]);
+  expect(screen.getByRole("dialog", { name: "Privacy notice" })).toBeInTheDocument();
+  expect(screen.getByText(/passes them to Anthropic, the provider of the AI model/)).toBeInTheDocument();
+  expect(screen.getByText(/MiKardex is operated by Fernanda Cabrera. Contact: hola@mikardex.cl./)).toBeInTheDocument();
+});
+
+test("sample data: summary cards and the full order list", () => {
+  jest.useFakeTimers();
+  render(<App />);
+  fireEvent.click(screen.getByText("Try with sample data"));
+  act(() => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+
+  expect(screen.getByText("Running out first")).toBeInTheDocument();
+  expect(screen.getByText("To order today")).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/health$/));
+
+  fireEvent.click(screen.getByText("See the order list"));
+  expect(screen.getByText("What to order today")).toBeInTheDocument();
+  expect(screen.getByText("Download order list (Excel)")).toBeInTheDocument();
+  expect(screen.queryByText("Unlock the full list")).not.toBeInTheDocument();
+  expect(screen.getByText(/^Total · Products: \d+$/)).toBeInTheDocument();
+});
+
+test("own file on the free plan: three rows of the order list, the rest behind the plan", () => {
+  const items = Array.from({ length: 6 }, (_, i) => ({
+    sku: `A${i}`, name: `Product ${i}`, warehouse: "Main", stock: i, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3, unit_cost: 10,
+  }));
+  window.localStorage.setItem("mikardex.dataset", JSON.stringify({ source: "upload", fileName: "stock.xlsx", loadedAt: "2026-10-01T12:00:00.000Z", items }));
+  window.localStorage.setItem("mikardex.uploadsUsed", "1");
+  render(<App />);
+
+  // summary: money stays behind the plan
+  expect(screen.getByTestId("summary-cards")).toBeInTheDocument();
+  expect(screen.queryByText(/Estimated order:/)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^Order list/ }));
+  expect(screen.getByText("Product 0")).toBeInTheDocument();
+  expect(screen.getByText("Product 2")).toBeInTheDocument();
+  expect(screen.queryByText("Product 3")).not.toBeInTheDocument();
+  expect(screen.getByText(/More products on the list: 3\./)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText("Unlock the full list"));
+  expect(screen.getByText("The full order list and its Excel download are part of the plan.")).toBeInTheDocument();
 });

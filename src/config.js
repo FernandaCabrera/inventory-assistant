@@ -23,3 +23,17 @@ export const SAFETY_FACTOR = 1.5;
 
 // Stock above EXCESS_RATIO x reorder point counts as excess
 export const EXCESS_RATIO = 3;
+
+// Order list
+export const ORDER_COVER_DAYS = 30; // days of sales a new order should cover, on top of the reorder point
+export const ORDER_FREE_ROWS = 3; // rows of the order list shown without a plan
+export const COVER_DAYS_MIN = 1;
+export const COVER_DAYS_MAX = 365;
+
+// Price shown in the plan window, per language, e.g. { es: "$19.990 al mes", en: "CAD $29 per month" }.
+// Leave empty to show no price.
+export const PLAN_PRICE = { es: "", en: "" };
+
+// Who is behind the tool (shown on the home page)
+export const OWNER_NAME = "Fernanda Cabrera";
+export const OWNER_LINKEDIN = "https://www.linkedin.com/in/fernandacabrera-data";
