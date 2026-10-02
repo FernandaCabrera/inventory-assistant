@@ -17,6 +17,10 @@ const STRINGS = {
     privacy:
       "Your file is read in your browser. Your inventory data is sent to the AI only when you ask a question.",
 
+    home: "Home",
+    continueWith: "Continue with {name}",
+    clearData: "Remove my data from this browser",
+    clearConfirm: "The products you loaded will be removed from this browser. Continue?",
     tabAssistant: "Assistant",
     tabDashboard: "Dashboard",
     loadedAt: "Loaded {time}",
@@ -293,6 +297,10 @@ const STRINGS = {
     privacy:
       "Tu archivo se lee en tu navegador. Los datos de tu inventario se envían a la IA solo cuando haces una pregunta.",
 
+    home: "Inicio",
+    continueWith: "Continuar con {name}",
+    clearData: "Borrar mis datos de este navegador",
+    clearConfirm: "Se borrarán de este navegador los productos que cargaste. ¿Continuar?",
     tabAssistant: "Asistente",
     tabDashboard: "Dashboard",
     loadedAt: "Cargado {time}",
