@@ -187,7 +187,7 @@ function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t,
                 <th style={{ ...th, textAlign: "left" }}>{t("ccColStatus")}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-testid="count-last-rows">
               {visible.map((row, i) => (
                 <tr key={i}>
                   <td style={{ ...cell, fontFamily: FONT_MONO, fontSize: 12.5 }}>{name(row)}</td>

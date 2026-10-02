@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import App from "./App";
 
 jest.mock("recharts", () => {
@@ -239,8 +239,8 @@ test("the count report says where to count: cycle, filter and areas", () => {
   fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "outside" } });
   const outside = Number(/Coincidencias: (\d+)/.exec(screen.getByTestId("count-last-matches").textContent)[1]);
   expect(outside).toBeGreaterThan(50);
-  expect(screen.getByTestId("count-last").querySelector("tbody")).not.toHaveTextContent("Dentro del ciclo");
-  const firstArea = screen.getByTestId("count-last-zones").querySelector("button");
+  expect(screen.getByTestId("count-last-rows")).not.toHaveTextContent("Dentro del ciclo");
+  const firstArea = within(screen.getByTestId("count-last-zones")).getAllByRole("button")[0];
   const inArea = Number(/· (\d+)/.exec(firstArea.textContent)[1]);
   fireEvent.click(firstArea);
   expect(firstArea).toHaveAttribute("aria-pressed", "true");
@@ -249,8 +249,8 @@ test("the count report says where to count: cycle, filter and areas", () => {
   // by the month of the last count
   fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "2026-06" } });
   expect(screen.getByTestId("count-last-matches")).toHaveTextContent(/Coincidencias: \d+/);
-  expect(screen.getByTestId("count-last").querySelector("tbody")).toHaveTextContent("jun 2026");
-  expect(screen.getByTestId("count-last").querySelector("tbody")).not.toHaveTextContent("jul 2026");
+  expect(screen.getByTestId("count-last-rows")).toHaveTextContent("jun 2026");
+  expect(screen.getByTestId("count-last-rows")).not.toHaveTextContent("jul 2026");
 
   // a longer cycle leaves nothing outside it in a three-month example
   fireEvent.change(screen.getByTestId("count-cycle"), { target: { value: "90" } });
