@@ -68,3 +68,15 @@ test("a stored upload on the free plan shows the dashboard locked", () => {
   fireEvent.click(screen.getByText("Replace data"));
   expect(screen.getByText(/The free plan includes 1 file/)).toBeInTheDocument();
 });
+
+test("the AI prompt is not shown to visitors", () => {
+  jest.useFakeTimers();
+  render(<App />);
+  fireEvent.click(screen.getByText("Try with sample data"));
+  act(() => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+  expect(screen.getByText("New conversation")).toBeInTheDocument();
+  expect(screen.queryByText("View prompt")).not.toBeInTheDocument();
+});

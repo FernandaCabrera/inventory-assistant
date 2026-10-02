@@ -4,6 +4,11 @@
 export const FREE_UPLOADS = 1; // files a visitor can analyze without a plan
 export const FREE_QUESTIONS = 3; // questions to the assistant without a plan
 
+// Show the "View prompt" button that lets visitors read the AI's instructions.
+// Off for the public launch. To use it in a demo, set this to true AND start the
+// server with EXPOSE_SYSTEM_PROMPT=true.
+export const SHOW_PROMPT = false;
+
 // Where people are sent when a request cannot be delivered automatically
 export const CONTACT_EMAIL = "hola@mikardex.cl";
 

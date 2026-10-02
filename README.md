@@ -93,6 +93,7 @@ npm test
 | Questions per day in total | server env `GLOBAL_DAILY_QUESTIONS` | 200 |
 | SKUs sent to the AI per question | server env `MAX_ITEMS_FOR_AI` | 800 |
 | Where plan requests are emailed | server env `LEADS_RECIPIENT` | `ALERT_RECIPIENT` |
+| "View prompt" button (shows the AI instructions) | `src/config.js` → `SHOW_PROMPT` and server env `EXPOSE_SYSTEM_PROMPT=true` | off |
 
 To give a customer the plan: add a code to `ACCESS_CODES`, restart the server, and send them the code. They enter it under "Free plan" in the app. Removing the code switches their plan off on their next visit.
 

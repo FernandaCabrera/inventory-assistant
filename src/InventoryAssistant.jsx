@@ -34,7 +34,7 @@ import {
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
 import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, tiedUpValue, summarize, toNumber } from "./inventoryLogic";
-import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS } from "./config";
+import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT } from "./config";
 import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
 import UpgradeModal from "./UpgradeModal";
@@ -1136,15 +1136,17 @@ export default function InventoryAssistant() {
           <button onClick={requestUpload} style={{ ...chipButtonStyle, background: COLORS.ink, color: "#F4F1EA" }}>
             <Upload size={11} /> {isSample ? t("uploadExcel") : t("replaceData")}
           </button>
-          <button onClick={toggleShowPrompt} style={chipButtonStyle}>
-            {showPrompt ? <EyeOff size={11} /> : <Eye size={11} />} {showPrompt ? t("hidePrompt") : t("viewPrompt")}
-          </button>
+          {SHOW_PROMPT && (
+            <button onClick={toggleShowPrompt} style={chipButtonStyle}>
+              {showPrompt ? <EyeOff size={11} /> : <Eye size={11} />} {showPrompt ? t("hidePrompt") : t("viewPrompt")}
+            </button>
+          )}
           <button onClick={resetConversation} style={{ ...chipButtonStyle, color: COLORS.inkMuted, border: `1px solid ${COLORS.line}` }}>
             <RotateCcw size={11} /> {t("newConversation")}
           </button>
         </div>
 
-        {showPrompt && (
+        {SHOW_PROMPT && showPrompt && (
           <pre
             style={{
               background: COLORS.ink,

@@ -336,7 +336,10 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+// The AI's instructions are private by default. Set EXPOSE_SYSTEM_PROMPT=true (together with
+// SHOW_PROMPT in src/config.js) to show them in the app, e.g. for a demo.
 app.get("/api/system-prompt", (req, res) => {
+  if (process.env.EXPOSE_SYSTEM_PROMPT !== "true") return res.status(404).json({ error: "not_found" });
   res.json({ prompt: SYSTEM_PROMPT });
 });
 
