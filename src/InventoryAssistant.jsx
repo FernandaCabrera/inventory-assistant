@@ -1,6 +1,22 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Package, Lock, Clock, Download, Eye, EyeOff, FileText, Search, RotateCcw, Loader2, ArrowRight } from "lucide-react";
-import inventory from "./data/inventory.json";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import {
+  Send,
+  Package,
+  Lock,
+  Clock,
+  Download,
+  Eye,
+  EyeOff,
+  FileText,
+  Search,
+  RotateCcw,
+  Loader2,
+  ArrowRight,
+  Upload,
+  FileSpreadsheet,
+  BadgeCheck,
+} from "lucide-react";
+import sampleInventory from "./data/inventory.json";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
 import {
   BarChart,
@@ -15,30 +31,22 @@ import {
   Pie,
   Legend,
 } from "recharts";
+import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
+import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney } from "./i18n";
+import { STATUS_ORDER, statusFor, daysOfCover, tiedUpValue, summarize, toNumber } from "./inventoryLogic";
+import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT } from "./config";
+import { load, save, remove } from "./storage";
+import ImportModal from "./ImportModal";
+import UpgradeModal from "./UpgradeModal";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4001";
 
-const COLORS = {
-  bg: "#EEF1EC",
-  surface: "#FFFFFF",
-  surfaceAlt: "#F7F8F5",
-  ink: "#15181A",
-  inkMuted: "#6B7268",
-  line: "#DADFD7",
-  critical: "#C1431F",
-  criticalBg: "#F7E6DE",
-  low: "#B8862E",
-  lowBg: "#F5EEDC",
-  ok: "#2E6F4E",
-  okBg: "#E3EEE6",
-  excess: "#3A5A8C",
-  excessBg: "#E4E9F2",
-};
+// Most urgent first in lists
+const LIST_ORDER = { critical: 0, low: 1, idle: 2, excess: 3, ok: 4 };
+const SIDEBAR_LIMIT = 200;
 
 function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth <= 760 : false
-  );
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 760 : false);
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth <= 760);
@@ -61,19 +69,33 @@ function useGoogleFonts() {
   }, []);
 }
 
-function BarcodeStrip({ animated = false }) {
-  const bars = Array.from({ length: 60 }, () => Math.random() > 0.5);
+function GlobalStyles() {
   return (
-    <div style={{ position: "relative", height: 14, overflow: "hidden" }}>
+    <style>{`
+      @keyframes ia-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      .ia-spin { animation: ia-spin 0.8s linear infinite; }
+      @keyframes ia-scan {
+        0% { left: 0%; opacity: 1; }
+        45% { opacity: 1; }
+        50% { left: calc(100% - 3px); opacity: 1; }
+        55% { opacity: 0; }
+        100% { left: 0%; opacity: 0; }
+      }
+      .ia-scanline { animation: ia-scan 2.2s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .ia-scanline, .ia-spin { animation: none; }
+      }
+    `}</style>
+  );
+}
+
+function BarcodeStrip({ animated = false }) {
+  const bars = useMemo(() => Array.from({ length: 60 }, () => Math.random() > 0.5), []);
+  return (
+    <div style={{ position: "relative", height: 14, overflow: "hidden" }} aria-hidden="true">
       <div style={{ display: "flex", gap: 2, height: 14, alignItems: "stretch", opacity: 0.55 }}>
         {bars.map((wide, i) => (
-          <div
-            key={i}
-            style={{
-              width: wide ? 3 : 1.5,
-              background: COLORS.ink,
-            }}
-          />
+          <div key={i} style={{ width: wide ? 3 : 1.5, background: COLORS.ink }} />
         ))}
       </div>
       {animated && (
@@ -94,42 +116,57 @@ function BarcodeStrip({ animated = false }) {
   );
 }
 
-const STATUS_META = {
-  critical: { label: "CRITICAL", color: COLORS.critical, bg: COLORS.criticalBg },
-  low: { label: "LOW", color: COLORS.low, bg: COLORS.lowBg },
-  ok: { label: "OK", color: COLORS.ok, bg: COLORS.okBg },
-  excess: { label: "EXCESS", color: COLORS.excess, bg: COLORS.excessBg },
-};
-
-function statusFor(item) {
-  const ratio = item.stock / item.reorder_point;
-  if (ratio < 0.5) return "critical";
-  if (ratio < 1) return "low";
-  if (ratio > 3) return "excess";
-  return "ok";
+function LanguageToggle({ lang, onChange }) {
+  return (
+    <div
+      role="group"
+      aria-label="Language / Idioma"
+      style={{ display: "inline-flex", border: `1px solid ${COLORS.ink}`, borderRadius: 6, overflow: "hidden" }}
+    >
+      {LANGS.map((code) => (
+        <button
+          key={code}
+          onClick={() => onChange(code)}
+          aria-pressed={lang === code}
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+            padding: "6px 11px",
+            border: "none",
+            background: lang === code ? COLORS.ink : "transparent",
+            color: lang === code ? "#F4F1EA" : COLORS.ink,
+            cursor: "pointer",
+          }}
+        >
+          {code.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-function StatusStamp({ status }) {
-  const meta = STATUS_META[status];
-  const isCritical = status === "critical";
+function StatusStamp({ status, t }) {
+  const style = STATUS_STYLE[status];
   return (
     <span
       style={{
         display: "inline-block",
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: FONT_MONO,
         fontSize: 10,
         fontWeight: 600,
         letterSpacing: "0.08em",
-        color: meta.color,
-        background: meta.bg,
-        border: `1.5px solid ${meta.color}`,
+        color: style.color,
+        background: style.bg,
+        border: `1.5px solid ${style.color}`,
         borderRadius: 4,
         padding: "2px 7px",
-        transform: isCritical ? "rotate(-2deg)" : "none",
+        transform: status === "critical" ? "rotate(-2deg)" : "none",
         whiteSpace: "nowrap",
       }}
     >
-      {meta.label}
+      {t(`status_${status}`)}
     </span>
   );
 }
@@ -143,12 +180,13 @@ function KPICard({ label, value, color }) {
         borderRadius: 10,
         padding: "16px 18px",
         flex: 1,
-        minWidth: 130,
+        minWidth: 124,
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: FONT_MONO,
           fontSize: 10,
           fontWeight: 600,
           letterSpacing: "0.08em",
@@ -159,7 +197,7 @@ function KPICard({ label, value, color }) {
       >
         {label}
       </div>
-      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 30, fontWeight: 600, color: color || COLORS.ink }}>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 30, fontWeight: 600, color: color || COLORS.ink, whiteSpace: "nowrap" }}>
         {value}
       </div>
     </div>
@@ -174,11 +212,12 @@ function ChartCard({ title, children, height = 280 }) {
         border: `1px solid ${COLORS.line}`,
         borderRadius: 10,
         padding: "18px 18px 10px",
+        minWidth: 0,
       }}
     >
       <div
         style={{
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: FONT_MONO,
           fontSize: 11,
           fontWeight: 600,
           letterSpacing: "0.06em",
@@ -194,59 +233,67 @@ function ChartCard({ title, children, height = 280 }) {
   );
 }
 
-function Dashboard() {
+function Dashboard({ items, lang, t }) {
   const isMobile = useIsMobile();
-  const statusCounts = { critical: 0, low: 0, ok: 0, excess: 0 };
-  inventory.forEach((item) => {
-    statusCounts[statusFor(item)] += 1;
-  });
+  const summary = useMemo(() => summarize(items), [items]);
 
-  const statusData = [
-    { name: "Critical", value: statusCounts.critical, color: COLORS.critical },
-    { name: "Low", value: statusCounts.low, color: COLORS.low },
-    { name: "OK", value: statusCounts.ok, color: COLORS.ok },
-    { name: "Excess", value: statusCounts.excess, color: COLORS.excess },
-  ];
+  const statusData = STATUS_ORDER.map((status) => ({
+    name: t(`statusName_${status}`),
+    value: summary.counts[status],
+    color: STATUS_STYLE[status].color,
+  }));
 
   const COVER_CHART_LIMIT = 10;
-  const allCoverData = [...inventory]
-    .map((item) => ({
-      sku: item.sku,
-      days: Number((item.stock / item.avg_daily_usage).toFixed(1)),
-      color: STATUS_META[statusFor(item)].color,
-    }))
+  const allCoverData = items
+    .map((item) => ({ sku: item.sku, days: daysOfCover(item), color: STATUS_STYLE[statusFor(item)].color }))
+    .filter((d) => d.days !== null)
+    .map((d) => ({ ...d, days: Number(d.days.toFixed(1)) }))
     .sort((a, b) => a.days - b.days);
   const coverData = allCoverData.slice(0, COVER_CHART_LIMIT);
   const hiddenCount = allCoverData.length - coverData.length;
 
-  const warehouseTotals = {};
-  inventory.forEach((item) => {
-    warehouseTotals[item.warehouse] = (warehouseTotals[item.warehouse] || 0) + item.stock;
-  });
-  const warehouseData = Object.entries(warehouseTotals).map(([name, value]) => ({ name, value }));
-  const warehouseColors = [COLORS.ok, COLORS.low, COLORS.excess, COLORS.critical, COLORS.inkMuted];
+  const warehouseData = Object.entries(summary.warehouses).map(([name, value]) => ({ name, value }));
+  const warehouseColors = [COLORS.ok, COLORS.low, COLORS.excess, COLORS.critical, COLORS.idle, COLORS.inkMuted];
 
-  const totalUnits = inventory.reduce((sum, i) => sum + i.stock, 0);
+  const TIED_UP_LIMIT = 8;
+  const tiedUpData = items
+    .map((item) => ({ sku: item.sku, value: Math.round(tiedUpValue(item)), color: STATUS_STYLE[statusFor(item)].color }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, TIED_UP_LIMIT);
+
+  const axisTick = { fontSize: 11, fill: COLORS.inkMuted };
+  const skuTick = { fontSize: 11, fill: COLORS.ink, fontFamily: FONT_MONO };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <KPICard label="Total SKUs" value={inventory.length} />
-        <KPICard label="Critical" value={statusCounts.critical} color={COLORS.critical} />
-        <KPICard label="Low" value={statusCounts.low} color={COLORS.low} />
-        <KPICard label="Excess" value={statusCounts.excess} color={COLORS.excess} />
-        <KPICard label="Total Units" value={totalUnits.toLocaleString()} />
+        <KPICard label={t("kpiTotal")} value={formatNumber(lang, summary.total)} />
+        <KPICard label={t("statusName_critical")} value={summary.counts.critical} color={COLORS.critical} />
+        <KPICard label={t("statusName_low")} value={summary.counts.low} color={COLORS.low} />
+        <KPICard label={t("statusName_idle")} value={summary.counts.idle} color={COLORS.idle} />
+        <KPICard label={t("statusName_excess")} value={summary.counts.excess} color={COLORS.excess} />
+        <KPICard label={t("kpiUnits")} value={formatNumber(lang, summary.totalUnits)} />
       </div>
 
+      {summary.hasCost ? (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <KPICard label={t("kpiValue")} value={formatMoney(lang, summary.inventoryValue)} />
+          <KPICard label={t("kpiTiedUp")} value={formatMoney(lang, summary.tiedUp)} color={COLORS.idle} />
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5 }}>{t("noCostNote")}</div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-        <ChartCard title="SKUs by Status">
+        <ChartCard title={t("chartStatus")}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={statusData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: COLORS.inkMuted }} axisLine={{ stroke: COLORS.line }} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: COLORS.inkMuted }} axisLine={false} tickLine={false} width={24} />
+              <XAxis dataKey="name" tick={axisTick} axisLine={{ stroke: COLORS.line }} tickLine={false} interval={0} />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} width={34} />
               <Tooltip />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
+              <Bar dataKey="value" name={t("tooltipSkus")} radius={[4, 4, 0, 0]} maxBarSize={60}>
                 {statusData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
                 ))}
@@ -255,7 +302,7 @@ function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Units by Warehouse">
+        <ChartCard title={t("chartWarehouse")}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={warehouseData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
@@ -264,41 +311,130 @@ function Dashboard() {
                 ))}
               </Pie>
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip />
+              <Tooltip formatter={(value) => formatNumber(lang, value)} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
 
-      <ChartCard
-        title={
-          hiddenCount > 0
-            ? `Days of Cover — ${COVER_CHART_LIMIT} Most Urgent SKUs (of ${inventory.length} total)`
-            : "Days of Cover by SKU (lowest first)"
-        }
-        height={Math.max(220, coverData.length * 42)}
+      {coverData.length > 0 && (
+        <ChartCard
+          title={
+            hiddenCount > 0
+              ? t("chartCoverTop", { n: COVER_CHART_LIMIT, total: formatNumber(lang, items.length) })
+              : t("chartCoverAll")
+          }
+          height={Math.max(220, coverData.length * 42)}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={coverData} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} horizontal={false} />
+              <XAxis type="number" tick={axisTick} axisLine={{ stroke: COLORS.line }} tickLine={false} />
+              <YAxis type="category" dataKey="sku" tick={skuTick} axisLine={false} tickLine={false} width={86} />
+              <Tooltip />
+              <Bar dataKey="days" name={t("tooltipDays")} radius={[0, 4, 4, 0]} maxBarSize={22}>
+                {coverData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {tiedUpData.length > 0 && (
+        <ChartCard title={t("chartTiedUp", { n: tiedUpData.length })} height={Math.max(200, tiedUpData.length * 42)}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={tiedUpData} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} horizontal={false} />
+              <XAxis
+                type="number"
+                tick={axisTick}
+                axisLine={{ stroke: COLORS.line }}
+                tickLine={false}
+                tickFormatter={(v) => formatMoney(lang, v)}
+              />
+              <YAxis type="category" dataKey="sku" tick={skuTick} axisLine={false} tickLine={false} width={86} />
+              <Tooltip formatter={(value) => formatMoney(lang, value)} />
+              <Bar dataKey="value" name={t("tooltipValue")} radius={[0, 4, 4, 0]} maxBarSize={22}>
+                {tiedUpData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {summary.hasCost && (
+        <div style={{ fontSize: 12.5, color: COLORS.inkMuted, lineHeight: 1.5 }}>{t("tiedUpNote", { ratio: EXCESS_RATIO })}</div>
+      )}
+    </div>
+  );
+}
+
+// Free plan with the visitor's own file: the real dashboard is not rendered at all.
+// What sits behind the blur is the sample dataset, so nothing of theirs is in the page.
+function LockedDashboard({ summary, lang, t, onUnlock }) {
+  const teaser =
+    summary.hasCost && summary.tiedUpCount > 0
+      ? t("lockTeaserMoney", { count: formatNumber(lang, summary.tiedUpCount) })
+      : t("lockTeaserStatus", {
+          critical: summary.counts.critical,
+          low: summary.counts.low,
+          notMoving: summary.notMovingCount,
+        });
+
+  return (
+    <div style={{ position: "relative", minHeight: 420 }}>
+      <div
+        aria-hidden="true"
+        style={{ filter: "blur(7px)", opacity: 0.55, pointerEvents: "none", userSelect: "none", maxHeight: 640, overflow: "hidden" }}
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={coverData} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 11, fill: COLORS.inkMuted }} axisLine={{ stroke: COLORS.line }} tickLine={false} />
-            <YAxis
-              type="category"
-              dataKey="sku"
-              tick={{ fontSize: 11, fill: COLORS.ink, fontFamily: "'IBM Plex Mono', monospace" }}
-              axisLine={false}
-              tickLine={false}
-              width={70}
-            />
-            <Tooltip />
-            <Bar dataKey="days" radius={[0, 4, 4, 0]} maxBarSize={22}>
-              {coverData.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
+        <Dashboard items={sampleInventory} lang={lang} t={t} />
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          paddingTop: 48,
+        }}
+      >
+        <div
+          style={{
+            background: COLORS.surface,
+            border: `1px solid ${COLORS.ink}`,
+            borderRadius: 12,
+            padding: "24px 24px 26px",
+            maxWidth: 440,
+            width: "calc(100% - 28px)",
+            boxSizing: "border-box",
+            textAlign: "center",
+          }}
+        >
+          <Lock size={22} color={COLORS.ink} />
+          <h2
+            style={{
+              fontFamily: FONT_HEAD,
+              fontSize: 22,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              margin: "10px 0 10px",
+              color: COLORS.ink,
+              lineHeight: 1.2,
+            }}
+          >
+            {t("lockTitle")}
+          </h2>
+          <p style={{ fontSize: 14.5, lineHeight: 1.55, color: COLORS.ink, margin: "0 0 18px" }}>{teaser}</p>
+          <button onClick={onUnlock} style={primaryButton}>
+            {t("unlock")} <ArrowRight size={15} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -317,7 +453,7 @@ function renderWithBold(text) {
   });
 }
 
-function Message({ role, text, onExport, isExporting, isMobile }) {
+function Message({ role, text, onExport, isExporting, isMobile, t }) {
   const isUser = role === "user";
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 16 }}>
@@ -332,7 +468,8 @@ function Message({ role, text, onExport, isExporting, isMobile }) {
           fontSize: 14.5,
           lineHeight: 1.65,
           whiteSpace: "pre-wrap",
-          fontFamily: "'Inter', system-ui, sans-serif",
+          overflowWrap: "anywhere",
+          fontFamily: FONT_BODY,
         }}
       >
         {renderWithBold(text)}
@@ -348,7 +485,7 @@ function Message({ role, text, onExport, isExporting, isMobile }) {
               fontSize: 10.5,
               fontWeight: 600,
               letterSpacing: "0.06em",
-              fontFamily: "'IBM Plex Mono', monospace",
+              fontFamily: FONT_MONO,
               padding: "6px 11px",
               borderRadius: 5,
               border: `1px solid ${COLORS.ink}`,
@@ -361,11 +498,11 @@ function Message({ role, text, onExport, isExporting, isMobile }) {
           >
             {isExporting ? (
               <>
-                <Loader2 size={12} className="ia-spin" /> Generating...
+                <Loader2 size={12} className="ia-spin" /> {t("exporting")}
               </>
             ) : (
               <>
-                <Download size={12} /> Export report
+                <Download size={12} /> {t("exportReport")}
               </>
             )}
           </button>
@@ -374,18 +511,6 @@ function Message({ role, text, onExport, isExporting, isMobile }) {
     </div>
   );
 }
-
-const QUICK_PROMPTS = [
-  "Which SKUs are below reorder point?",
-  "Which SKUs have excess stock?",
-  "Which products barely turn over?",
-  "What should I order this week?",
-];
-
-const FULL_REPORT_PROMPT =
-  "Generate a full inventory status report covering the executive summary, stock status overview, " +
-  "reorder actions required, excess and slow-moving inventory, and recommendations — the kind presented " +
-  "in a weekly operations review meeting.";
 
 function playScanBeep() {
   try {
@@ -406,49 +531,46 @@ function playScanBeep() {
   }
 }
 
-function WelcomeScreen({ onEnter }) {
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample }) {
   return (
     <div
       style={{
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: FONT_BODY,
         background: COLORS.bg,
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
+        padding: "24px 16px",
         textAlign: "center",
+        position: "relative",
+        boxSizing: "border-box",
       }}
     >
-      <style>{`
-        @keyframes ia-scan {
-          0% { left: 0%; opacity: 1; }
-          45% { opacity: 1; }
-          50% { left: calc(100% - 3px); opacity: 1; }
-          55% { opacity: 0; }
-          100% { left: 0%; opacity: 0; }
-        }
-        .ia-scanline { animation: ia-scan 2.2s ease-in-out infinite; }
-      `}</style>
+      <div style={{ position: "absolute", top: 18, right: 18 }}>
+        <LanguageToggle lang={lang} onChange={onLang} />
+      </div>
+
       <div
         style={{
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: FONT_MONO,
           fontSize: 12,
           fontWeight: 600,
           letterSpacing: "0.2em",
           color: COLORS.inkMuted,
           textTransform: "uppercase",
           marginBottom: 14,
+          marginTop: 30,
         }}
       >
-        Inventory Manifest · Powered by MiKardex
+        {t("brand")}
       </div>
 
       <h1
         style={{
-          fontFamily: "'Oswald', sans-serif",
-          fontSize: "clamp(36px, 8vw, 64px)",
+          fontFamily: FONT_HEAD,
+          fontSize: "clamp(34px, 8vw, 64px)",
           fontWeight: 600,
           color: COLORS.ink,
           margin: 0,
@@ -457,88 +579,224 @@ function WelcomeScreen({ onEnter }) {
           lineHeight: 1.1,
         }}
       >
-        Ask Your Inventory
+        {t("title")}
       </h1>
 
       <div style={{ margin: "22px 0", maxWidth: 420, width: "100%" }}>
         <BarcodeStrip animated />
       </div>
 
-      <p
-        style={{
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontSize: 15,
-          color: COLORS.inkMuted,
-          maxWidth: 440,
-          lineHeight: 1.6,
-          marginBottom: 32,
-        }}
-      >
-        An AI operations analyst for your inventory. Ask about stockouts, excess stock, and reorder
-        timing — or generate a full status report in seconds.
-      </p>
+      <p style={{ fontSize: 15.5, color: COLORS.inkMuted, maxWidth: 470, lineHeight: 1.6, margin: "0 0 28px" }}>{t("tagline")}</p>
 
-      <button
-        onClick={() => {
-          playScanBeep();
-          setTimeout(onEnter, 150);
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 13,
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-          padding: "14px 26px",
-          borderRadius: 8,
-          border: "none",
-          background: COLORS.ink,
-          color: "#F4F1EA",
-          cursor: "pointer",
-        }}
-      >
-        Enter Assistant <ArrowRight size={15} />
-      </button>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <button
+          onClick={() => {
+            playScanBeep();
+            onUpload();
+          }}
+          style={{ ...primaryButton, padding: "14px 24px", fontSize: 13 }}
+        >
+          <Upload size={15} /> {t("uploadCta")}
+        </button>
+        <button
+          onClick={() => {
+            playScanBeep();
+            setTimeout(onSample, 150);
+          }}
+          style={{ ...secondaryButton, padding: "14px 24px", fontSize: 13 }}
+        >
+          {t("sampleCta")} <ArrowRight size={15} />
+        </button>
+      </div>
+
+      <p style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLORS.ink, letterSpacing: "0.03em", margin: "20px 0 6px" }}>
+        {t("freeNote", { uploads: FREE_UPLOADS, questions: FREE_QUESTIONS })}
+      </p>
+      <p style={{ fontSize: 12.5, color: COLORS.inkMuted, maxWidth: 440, lineHeight: 1.55, margin: 0 }}>{t("privacy")}</p>
     </div>
   );
+}
+
+const chipStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  fontFamily: FONT_MONO,
+  fontSize: 10.5,
+  fontWeight: 500,
+  letterSpacing: "0.04em",
+  color: COLORS.inkMuted,
+  background: COLORS.surfaceAlt,
+  border: `1px solid ${COLORS.line}`,
+  padding: "5px 10px",
+  borderRadius: 5,
+  textTransform: "uppercase",
+  maxWidth: "100%",
+};
+
+const chipButtonStyle = {
+  ...chipStyle,
+  fontWeight: 600,
+  color: COLORS.ink,
+  background: "none",
+  border: `1px solid ${COLORS.ink}`,
+  cursor: "pointer",
+};
+
+function loadStoredDataset() {
+  const stored = load("dataset", null);
+  if (!stored || !Array.isArray(stored.items) || stored.items.length === 0) return null;
+  return stored;
+}
+
+// Only complete question/answer pairs go back to the model as context.
+function historyForApi(messages) {
+  const turns = [];
+  for (let i = 0; i < messages.length - 1; i += 1) {
+    const q = messages[i];
+    const a = messages[i + 1];
+    if (q.role === "user" && a.role === "assistant" && !a.local) {
+      turns.push({ role: "user", text: q.text }, { role: "assistant", text: a.text });
+    }
+  }
+  return turns.slice(-6);
 }
 
 export default function InventoryAssistant() {
   useGoogleFonts();
   const isMobile = useIsMobile();
-  const [hasEntered, setHasEntered] = useState(false);
-  const warehouseCount = new Set(inventory.map((i) => i.warehouse)).size;
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      text: `${inventory.length} SKUs loaded across ${warehouseCount} warehouses. Start with a question, or generate the full status report.`,
-    },
-  ]);
+
+  const [lang, setLang] = useState(() => {
+    const stored = load("lang", null);
+    return LANGS.includes(stored) ? stored : detectLang();
+  });
+  const t = useMemo(() => translator(lang), [lang]);
+
+  const [dataset, setDataset] = useState(loadStoredDataset);
+  const [hasEntered, setHasEntered] = useState(() => dataset !== null);
+  const [uploadsUsed, setUploadsUsed] = useState(() => Number(load("uploadsUsed", 0)) || 0);
+  const [questionsUsed, setQuestionsUsed] = useState(() => Number(load("questionsUsed", 0)) || 0);
+  const [accessCode, setAccessCode] = useState(() => String(load("accessCode", "") || ""));
+  const paid = accessCode !== "";
+
+  const [messages, setMessages] = useState([{ role: "assistant", greeting: true }]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [view, setView] = useState("assistant");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loadedAt] = useState(() => new Date());
   const [exportingIndex, setExportingIndex] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState(null); // null = closed
   const scrollRef = useRef(null);
+
+  const items = useMemo(() => (dataset ? dataset.items : []), [dataset]);
+  const summary = useMemo(() => summarize(items), [items]);
+  const isSample = !dataset || dataset.source === "sample";
+  const dashboardLocked = !isSample && !paid;
+  const questionsLeft = paid ? Infinity : Math.max(0, FREE_QUESTIONS - questionsUsed);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = lang === "es" ? "MiKardex · Pregúntale a tu inventario" : "MiKardex · Ask Your Inventory";
+  }, [lang]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
 
+  // A stored code is checked once per visit; a code that was withdrawn stops unlocking.
+  useEffect(() => {
+    if (!accessCode) return;
+    let cancelled = false;
+    fetch(`${API_URL}/api/validate-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: accessCode }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && data.valid === false) {
+          setAccessCode("");
+          remove("accessCode");
+        }
+      })
+      .catch(() => {
+        // offline or server asleep: keep the code and try again next visit
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function changeLang(next) {
+    setLang(next);
+    save("lang", next);
+  }
+
+  function greetingText() {
+    if (isSample) {
+      return t("greetingSample", { n: summary.total, w: summary.warehouseCount });
+    }
+    const lines = [
+      t("greetingUpload", {
+        n: formatNumber(lang, summary.total),
+        file: dataset.fileName,
+        critical: summary.counts.critical,
+        low: summary.counts.low,
+        idle: summary.counts.idle,
+        excess: summary.counts.excess,
+      }),
+    ];
+    const report = dataset.report || {};
+    if (report.skippedNoStock > 0) lines.push(t("reportSkippedNoStock", { n: report.skippedNoStock }));
+    if (report.negatives > 0) lines.push(t("reportNegatives", { n: report.negatives }));
+    if (report.truncated) lines.push(t("reportTruncated", { max: formatNumber(lang, MAX_ROWS) }));
+    return lines.join("\n\n");
+  }
+
   function resetConversation() {
-    setMessages([
-      {
-        role: "assistant",
-        text: `${inventory.length} SKUs loaded across ${warehouseCount} warehouses. Start with a question, or generate the full status report.`,
-      },
-    ]);
+    setMessages([{ role: "assistant", greeting: true }]);
     setInput("");
+  }
+
+  function loadSampleData() {
+    setDataset({ items: sampleInventory, source: "sample", fileName: null, loadedAt: new Date().toISOString() });
+    resetConversation();
+    setHasEntered(true);
+  }
+
+  function requestUpload() {
+    if (!paid && uploadsUsed >= FREE_UPLOADS) {
+      setUpgradeReason("upload");
+      return;
+    }
+    setShowImport(true);
+  }
+
+  function handleImported({ items: imported, fileName, report }) {
+    const next = { items: imported, source: "upload", fileName, report, loadedAt: new Date().toISOString() };
+    setDataset(next);
+    save("dataset", next);
+    const used = uploadsUsed + 1;
+    setUploadsUsed(used);
+    save("uploadsUsed", used);
+    setShowImport(false);
+    setSearchQuery("");
+    setView("assistant");
+    resetConversation();
+    setHasEntered(true);
+  }
+
+  const closeImport = useCallback(() => setShowImport(false), []);
+  const closeUpgrade = useCallback(() => setUpgradeReason(null), []);
+
+  function handleActivated(code) {
+    const clean = code.trim().toUpperCase();
+    setAccessCode(clean);
+    save("accessCode", clean);
   }
 
   async function toggleShowPrompt() {
@@ -548,24 +806,25 @@ export default function InventoryAssistant() {
         const data = await res.json();
         setSystemPrompt(data.prompt);
       } catch (err) {
-        setSystemPrompt("Could not load system prompt — make sure the backend server is running.");
+        setSystemPrompt(t("promptError"));
       }
     }
     setShowPrompt((s) => !s);
   }
 
-  async function exportReport(text, actionItems = [], relevantCharts = [], index = null) {
+  async function exportReport(text, actionItems = [], index = null) {
     setExportingIndex(index);
     const startTime = Date.now();
     const clean = text.replace(/\*\*/g, "");
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Inventory Assistant";
+    workbook.creator = "MiKardex";
     workbook.created = new Date();
 
     const statusColors = {
       critical: "FFC1431F",
       low: "FFB8862E",
       ok: "FF2E6F4E",
+      idle: "FF6B4E8C",
       excess: "FF3A5A8C",
     };
     const priorityColors = {
@@ -574,57 +833,53 @@ export default function InventoryAssistant() {
       Low: "FF2E6F4E",
       None: "FF9AA096",
     };
-    const statusFill = (status) => ({
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: statusColors[status] || "FF6B7268" },
-    });
+    const darkHeader = (row) => {
+      row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF15181A" } };
+    };
 
     // Sheet 1: Report narrative
-    const summary = workbook.addWorksheet("Report");
-    summary.columns = [{ width: 100 }];
-    const titleRow = summary.addRow(["INVENTORY REPORT"]);
+    const report = workbook.addWorksheet(t("xlsReport"));
+    report.columns = [{ width: 100 }];
+    const titleRow = report.addRow([t("xlsTitle")]);
     titleRow.font = { bold: true, size: 16, color: { argb: "FF15181A" } };
-    summary.addRow([new Date().toLocaleString()]).font = { italic: true, color: { argb: "FF6B7268" } };
-    summary.addRow([]);
+    report.addRow([new Date().toLocaleString(LOCALES[lang])]).font = { italic: true, color: { argb: "FF6B7268" } };
+    report.addRow([]);
     clean
       .split("\n")
       .filter(Boolean)
       .forEach((line) => {
-        const row = summary.addRow([line]);
+        const row = report.addRow([line]);
         row.alignment = { wrapText: true, vertical: "top" };
         row.font = { size: 11, color: { argb: "FF15181A" } };
       });
+    report.addRow([]);
+    report.addRow([t("xlsFooter")]).font = { italic: true, size: 10, color: { argb: "FF6B7268" } };
 
     // Sheet 2: Action Plan — real columns, built from the model's structured output
     if (actionItems.length > 0) {
-      const plan = workbook.addWorksheet("Action Plan");
+      const plan = workbook.addWorksheet(t("xlsPlan"));
       plan.columns = [
-        { header: "SKU", key: "sku", width: 12 },
-        { header: "Issue", key: "issue", width: 40 },
-        { header: "Recommended Action", key: "action", width: 40 },
-        { header: "Priority", key: "priority", width: 12 },
+        { header: "SKU", key: "sku", width: 14 },
+        { header: t("xlsIssue"), key: "issue", width: 40 },
+        { header: t("xlsAction"), key: "action", width: 40 },
+        { header: t("xlsPriority"), key: "priority", width: 16 },
       ];
-      const planHeader = plan.getRow(1);
-      planHeader.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      planHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF15181A" } };
+      darkHeader(plan.getRow(1));
       plan.views = [{ state: "frozen", ySplit: 1 }];
 
       actionItems.forEach((item) => {
+        const priority = priorityColors[item.priority] ? item.priority : "None";
         const row = plan.addRow({
           sku: item.sku || "—",
           issue: item.issue || "",
           action: item.recommended_action || "",
-          priority: item.priority || "None",
+          priority: t(`priority_${priority}`),
         });
         row.getCell("issue").alignment = { wrapText: true, vertical: "top" };
         row.getCell("action").alignment = { wrapText: true, vertical: "top" };
         const priorityCell = row.getCell("priority");
-        priorityCell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: priorityColors[item.priority] || priorityColors.None },
-        };
+        priorityCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: priorityColors[priority] } };
         priorityCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
         priorityCell.alignment = { horizontal: "center" };
         row.eachCell((cell) => {
@@ -634,39 +889,44 @@ export default function InventoryAssistant() {
     }
 
     // Sheet 3: Full inventory snapshot
-    const sheet = workbook.addWorksheet("Inventory Snapshot");
-    sheet.columns = [
-      { header: "SKU", key: "sku", width: 12 },
-      { header: "Name", key: "name", width: 30 },
-      { header: "Warehouse", key: "warehouse", width: 16 },
-      { header: "Stock", key: "stock", width: 10 },
-      { header: "Reorder Point", key: "reorder", width: 15 },
-      { header: "Lead Time (days)", key: "lead", width: 16 },
-      { header: "Avg Daily Usage", key: "usage", width: 16 },
-      { header: "Days of Cover", key: "cover", width: 14 },
-      { header: "Status", key: "status", width: 12 },
+    const sheet = workbook.addWorksheet(t("xlsSnapshot"));
+    const columns = [
+      { header: "SKU", key: "sku", width: 14 },
+      { header: t("xlsName"), key: "name", width: 32 },
+      { header: t("xlsWarehouse"), key: "warehouse", width: 16 },
+      { header: t("xlsStock"), key: "stock", width: 10 },
+      { header: t("xlsReorder"), key: "reorder", width: 17 },
+      { header: t("xlsLead"), key: "lead", width: 18 },
+      { header: t("xlsUsage"), key: "usage", width: 16 },
+      { header: t("xlsCover"), key: "cover", width: 17 },
     ];
-    const headerRow = sheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF15181A" } };
+    if (summary.hasCost) {
+      columns.push({ header: t("xlsCost"), key: "cost", width: 14 }, { header: t("xlsValue"), key: "value", width: 16 });
+    }
+    columns.push({ header: t("xlsStatus"), key: "status", width: 14 });
+    sheet.columns = columns;
+    darkHeader(sheet.getRow(1));
     sheet.views = [{ state: "frozen", ySplit: 1 }];
 
-    inventory.forEach((item) => {
-      const ratio = item.stock / item.reorder_point;
-      const status = ratio < 0.5 ? "critical" : ratio < 1 ? "low" : ratio > 3 ? "excess" : "ok";
+    items.forEach((item) => {
+      const status = statusFor(item);
+      const cover = daysOfCover(item);
+      const cost = toNumber(item.unit_cost);
       const row = sheet.addRow({
         sku: item.sku,
         name: item.name,
         warehouse: item.warehouse,
         stock: item.stock,
-        reorder: item.reorder_point,
-        lead: item.lead_time_days,
-        usage: item.avg_daily_usage,
-        cover: Number((item.stock / item.avg_daily_usage).toFixed(1)),
-        status: status.toUpperCase(),
+        reorder: item.reorder_point ?? "",
+        lead: item.lead_time_days ?? "",
+        usage: item.avg_daily_usage ?? "",
+        cover: cover === null ? "" : Number(cover.toFixed(1)),
+        cost: cost ?? "",
+        value: cost === null ? "" : Math.round(item.stock * cost),
+        status: t(`status_${status}`),
       });
       const statusCell = row.getCell("status");
-      statusCell.fill = statusFill(status);
+      statusCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusColors[status] } };
       statusCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
       statusCell.alignment = { horizontal: "center" };
       row.eachCell((cell) => {
@@ -680,7 +940,7 @@ export default function InventoryAssistant() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `inventory-report-${dateStamp}.xlsx`;
+    a.download = `${t("xlsFile")}-${dateStamp}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
     const elapsed = Date.now() - startTime;
@@ -693,75 +953,127 @@ export default function InventoryAssistant() {
 
   async function send(promptText) {
     const text = (promptText ?? input).trim();
-    if (!text) return;
+    if (!text || typing) return;
+    if (questionsLeft <= 0) {
+      setUpgradeReason("questions");
+      return;
+    }
+    const history = historyForApi(messages);
     setMessages((m) => [...m, { role: "user", text }]);
     setInput("");
     setTyping(true);
 
     try {
-      const historyForApi = messages
-        .filter((m, i) => i > 0 && (m.role === "user" || m.role === "assistant"))
-        .slice(-6)
-        .map((m) => ({ role: m.role, text: m.text }));
-
       const res = await fetch(`${API_URL}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, inventory, history: historyForApi }),
+        body: JSON.stringify({ question: text, inventory: items, history, code: accessCode || undefined }),
       });
-      const data = await res.json();
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: data.answer, actionItems: data.actionItems || [], relevantCharts: data.relevantCharts || [] },
-      ]);
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 429) {
+        const key = data.scope === "plan" ? "limitPlan" : data.scope === "global" ? "limitGlobal" : "limitFree";
+        setMessages((m) => [...m, { role: "assistant", text: t(key), local: true }]);
+      } else if (!res.ok || typeof data.answer !== "string") {
+        setMessages((m) => [...m, { role: "assistant", text: t("errAnswer"), local: true }]);
+      } else {
+        setMessages((m) => [...m, { role: "assistant", text: data.answer, actionItems: data.actionItems || [] }]);
+        if (!paid) {
+          const used = questionsUsed + 1;
+          setQuestionsUsed(used);
+          save("questionsUsed", used);
+        }
+      }
     } catch (err) {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: "Something went wrong reaching the assistant. Make sure the backend server is running." },
-      ]);
+      setMessages((m) => [...m, { role: "assistant", text: t("errBackend"), local: true }]);
     } finally {
       setTyping(false);
     }
   }
 
+  const modals = (
+    <>
+      {showImport && <ImportModal lang={lang} t={t} onClose={closeImport} onImported={handleImported} />}
+      {upgradeReason !== null && (
+        <UpgradeModal
+          t={t}
+          lang={lang}
+          reason={upgradeReason}
+          apiUrl={API_URL}
+          skuCount={isSample ? 0 : summary.total}
+          onClose={closeUpgrade}
+          onActivated={handleActivated}
+        />
+      )}
+    </>
+  );
+
   if (!hasEntered) {
-    return <WelcomeScreen onEnter={() => setHasEntered(true)} />;
+    return (
+      <>
+        <GlobalStyles />
+        <WelcomeScreen lang={lang} t={t} onLang={changeLang} onUpload={requestUpload} onSample={loadSampleData} />
+        {modals}
+      </>
+    );
   }
 
+  const query = searchQuery.trim().toLowerCase();
+  const matches = items
+    .map((item, index) => ({ item, index, status: statusFor(item) }))
+    .filter(({ item }) => {
+      if (!query) return true;
+      return String(item.sku).toLowerCase().includes(query) || String(item.name).toLowerCase().includes(query);
+    })
+    .sort((a, b) => LIST_ORDER[a.status] - LIST_ORDER[b.status] || a.index - b.index);
+  const visible = matches.slice(0, SIDEBAR_LIMIT);
+
+  const loadedDate = dataset && dataset.loadedAt ? new Date(dataset.loadedAt) : new Date();
+  const loadedLabel = loadedDate.toLocaleString(LOCALES[lang], {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" }}>
-      <style>{`
-        @keyframes ia-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .ia-spin { animation: ia-spin 0.8s linear infinite; }
-      `}</style>
+    <div style={{ fontFamily: FONT_BODY, background: COLORS.bg, minHeight: "100vh", padding: isMobile ? "20px 14px" : "36px 20px" }}>
+      <GlobalStyles />
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {/* Header */}
-        <div
-          style={{
-            fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.16em",
-            color: COLORS.inkMuted,
-            textTransform: "uppercase",
-            marginBottom: 6,
-          }}
-        >
-          Inventory Manifest · Powered by MiKardex
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                color: COLORS.inkMuted,
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              {t("brand")}
+            </div>
+            <h1
+              style={{
+                fontFamily: FONT_HEAD,
+                fontSize: isMobile ? 24 : 34,
+                fontWeight: 600,
+                color: COLORS.ink,
+                margin: 0,
+                letterSpacing: "0.01em",
+                textTransform: "uppercase",
+              }}
+            >
+              {t("title")}
+            </h1>
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <LanguageToggle lang={lang} onChange={changeLang} />
+          </div>
         </div>
-        <h1
-          style={{
-            fontFamily: "'Oswald', sans-serif",
-            fontSize: isMobile ? 24 : 34,
-            fontWeight: 600,
-            color: COLORS.ink,
-            margin: 0,
-            letterSpacing: "0.01em",
-            textTransform: "uppercase",
-          }}
-        >
-          Ask your inventory
-        </h1>
 
         <div style={{ margin: "16px 0 18px" }}>
           <BarcodeStrip />
@@ -769,14 +1081,17 @@ export default function InventoryAssistant() {
 
         <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.line}` }}>
           {[
-            { key: "assistant", label: "Assistant" },
-            { key: "dashboard", label: "Dashboard" },
+            { key: "assistant", label: t("tabAssistant") },
+            { key: "dashboard", label: t("tabDashboard") },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setView(tab.key)}
               style={{
-                fontFamily: "'IBM Plex Mono', monospace",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontFamily: FONT_MONO,
                 fontSize: 12,
                 fontWeight: 600,
                 letterSpacing: "0.05em",
@@ -791,94 +1106,47 @@ export default function InventoryAssistant() {
               }}
             >
               {tab.label}
+              {tab.key === "dashboard" && dashboardLocked && <Lock size={11} />}
             </button>
           ))}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10.5,
-              fontWeight: 500,
-              letterSpacing: "0.04em",
-              color: COLORS.inkMuted,
-              background: COLORS.surfaceAlt,
-              border: `1px solid ${COLORS.line}`,
-              padding: "5px 10px",
-              borderRadius: 5,
-              textTransform: "uppercase",
-            }}
-          >
-            <Clock size={11} /> Synced {loadedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          <span style={chipStyle}>
+            <FileSpreadsheet size={11} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+              {isSample ? t("sampleData") : dataset.fileName}
+            </span>
           </span>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10.5,
-              fontWeight: 500,
-              letterSpacing: "0.04em",
-              color: COLORS.inkMuted,
-              background: COLORS.surfaceAlt,
-              border: `1px solid ${COLORS.line}`,
-              padding: "5px 10px",
-              borderRadius: 5,
-              textTransform: "uppercase",
-            }}
-          >
-            <Lock size={11} /> Read-only
+          <span style={chipStyle}>
+            <Clock size={11} /> {t("loadedAt", { time: loadedLabel })}
           </span>
-          <button
-            onClick={toggleShowPrompt}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              color: COLORS.ink,
-              background: "none",
-              border: `1px solid ${COLORS.ink}`,
-              padding: "5px 10px",
-              borderRadius: 5,
-              cursor: "pointer",
-              textTransform: "uppercase",
-            }}
-          >
-            {showPrompt ? <EyeOff size={11} /> : <Eye size={11} />} {showPrompt ? "Hide" : "View"} prompt
+          <span style={chipStyle}>
+            <Lock size={11} /> {t("readOnly")}
+          </span>
+          {paid ? (
+            <span style={{ ...chipStyle, color: COLORS.ok, borderColor: COLORS.ok, background: COLORS.okBg, fontWeight: 600 }}>
+              <BadgeCheck size={11} /> {t("planActive")}
+            </span>
+          ) : (
+            <button onClick={() => setUpgradeReason("")} style={chipButtonStyle}>
+              {t("planFree")}
+            </button>
+          )}
+          <button onClick={requestUpload} style={{ ...chipButtonStyle, background: COLORS.ink, color: "#F4F1EA" }}>
+            <Upload size={11} /> {isSample ? t("uploadExcel") : t("replaceData")}
           </button>
-          <button
-            onClick={resetConversation}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              color: COLORS.inkMuted,
-              background: "none",
-              border: `1px solid ${COLORS.line}`,
-              padding: "5px 10px",
-              borderRadius: 5,
-              cursor: "pointer",
-              textTransform: "uppercase",
-            }}
-          >
-            <RotateCcw size={11} /> New conversation
+          {SHOW_PROMPT && (
+            <button onClick={toggleShowPrompt} style={chipButtonStyle}>
+              {showPrompt ? <EyeOff size={11} /> : <Eye size={11} />} {showPrompt ? t("hidePrompt") : t("viewPrompt")}
+            </button>
+          )}
+          <button onClick={resetConversation} style={{ ...chipButtonStyle, color: COLORS.inkMuted, border: `1px solid ${COLORS.line}` }}>
+            <RotateCcw size={11} /> {t("newConversation")}
           </button>
         </div>
 
-        {showPrompt && (
+        {SHOW_PROMPT && showPrompt && (
           <pre
             style={{
               background: COLORS.ink,
@@ -890,216 +1158,281 @@ export default function InventoryAssistant() {
               marginBottom: 20,
               overflowX: "auto",
               whiteSpace: "pre-wrap",
-              fontFamily: "'IBM Plex Mono', monospace",
+              fontFamily: FONT_MONO,
             }}
           >
-            {systemPrompt || "Loading..."}
+            {systemPrompt || t("promptLoading")}
           </pre>
         )}
 
         {view === "dashboard" ? (
-          <Dashboard />
-        ) : (
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 20 }}>
-          {/* Chat panel */}
-          <div
-            style={{
-              background: COLORS.surfaceAlt,
-              border: `1px solid ${COLORS.line}`,
-              borderRadius: 12,
-              display: "flex",
-              flexDirection: "column",
-              height: isMobile ? 480 : 560,
-            }}
-          >
-            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 20px 4px" }}>
-              {messages.map((m, i) => (
-                <Message
-                  key={i}
-                  role={m.role}
-                  text={m.text}
-                  isMobile={isMobile}
-                  isExporting={exportingIndex === i}
-                  onExport={m.role === "assistant" && i > 0 ? () => exportReport(m.text, m.actionItems || [], m.relevantCharts || [], i) : null}
-                />
-              ))}
-              {typing && (
+          dashboardLocked ? (
+            <LockedDashboard summary={summary} lang={lang} t={t} onUnlock={() => setUpgradeReason("dashboard")} />
+          ) : (
+            <>
+              {isSample && (
                 <div
                   style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 12,
-                    letterSpacing: "0.04em",
-                    color: COLORS.inkMuted,
-                    padding: "4px 4px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    background: COLORS.surface,
+                    border: `1px solid ${COLORS.line}`,
+                    borderRadius: 10,
+                    padding: "12px 16px",
+                    marginBottom: 16,
+                    fontSize: 13.5,
+                    color: COLORS.ink,
                   }}
                 >
-                  PROCESSING...
+                  {t("sampleBanner")}
+                  <button onClick={requestUpload} style={{ ...primaryButton, padding: "8px 14px", fontSize: 11.5 }}>
+                    <Upload size={13} /> {t("uploadExcel")}
+                  </button>
+                </div>
+              )}
+              <Dashboard items={items} lang={lang} t={t} />
+            </>
+          )
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 320px", gap: 20 }}>
+            {/* Chat panel */}
+            <div
+              style={{
+                background: COLORS.surfaceAlt,
+                border: `1px solid ${COLORS.line}`,
+                borderRadius: 12,
+                display: "flex",
+                flexDirection: "column",
+                height: isMobile ? 480 : 560,
+                minWidth: 0,
+              }}
+            >
+              <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 20px 4px" }}>
+                {messages.map((m, i) => (
+                  <Message
+                    key={i}
+                    role={m.role}
+                    text={m.greeting ? greetingText() : m.text}
+                    isMobile={isMobile}
+                    isExporting={exportingIndex === i}
+                    t={t}
+                    onExport={
+                      m.role === "assistant" && !m.greeting && !m.local
+                        ? () => exportReport(m.text, m.actionItems || [], i)
+                        : null
+                    }
+                  />
+                ))}
+                {typing && (
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 12, letterSpacing: "0.04em", color: COLORS.inkMuted, padding: "4px 4px 10px" }}>
+                    {t("processing")}
+                  </div>
+                )}
+              </div>
+
+              {messages.length <= 1 && questionsLeft > 0 && (
+                <div style={{ padding: "14px 20px 0", display: "flex", flexWrap: "wrap", gap: 7, borderTop: `1px solid ${COLORS.line}` }}>
+                  {t("quickPrompts").map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => send(q)}
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontSize: 12.5,
+                        padding: "7px 12px",
+                        borderRadius: 20,
+                        border: `1px solid ${COLORS.line}`,
+                        background: COLORS.surface,
+                        color: COLORS.ink,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => send(t("fullReportPrompt"))}
+                    style={{
+                      fontFamily: FONT_MONO,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      letterSpacing: "0.03em",
+                      padding: "7px 13px",
+                      borderRadius: 20,
+                      border: `1px solid ${COLORS.ink}`,
+                      background: COLORS.ink,
+                      color: "#F4F1EA",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <FileText size={12} /> {t("generateReport")}
+                  </button>
+                </div>
+              )}
+
+              {questionsLeft <= 0 ? (
+                <div
+                  style={{
+                    margin: 16,
+                    padding: "12px 14px",
+                    border: `1px solid ${COLORS.ink}`,
+                    borderRadius: 8,
+                    background: COLORS.surface,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    fontSize: 14,
+                    color: COLORS.ink,
+                  }}
+                >
+                  {t("freeUsedUp", { max: FREE_QUESTIONS })}
+                  <button onClick={() => setUpgradeReason("questions")} style={{ ...primaryButton, padding: "9px 14px", fontSize: 11.5 }}>
+                    {t("seePlan")} <ArrowRight size={13} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: 16 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && send()}
+                      placeholder={t("askPlaceholder")}
+                      aria-label={t("askPlaceholder")}
+                      maxLength={1000}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontFamily: FONT_BODY,
+                        fontSize: 14,
+                        padding: "11px 14px",
+                        borderRadius: 8,
+                        border: `1px solid ${COLORS.line}`,
+                        outline: "none",
+                        background: COLORS.surface,
+                      }}
+                    />
+                    <button
+                      onClick={() => send()}
+                      disabled={typing}
+                      aria-label={t("askPlaceholder")}
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 8,
+                        border: "none",
+                        background: COLORS.ink,
+                        color: "#F4F1EA",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: typing ? "default" : "pointer",
+                        opacity: typing ? 0.6 : 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                  {!paid && (
+                    <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: COLORS.inkMuted, letterSpacing: "0.03em", marginTop: 8 }}>
+                      {t("freeCounter", { used: questionsUsed, max: FREE_QUESTIONS })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {messages.length <= 1 && (
-            <div style={{ padding: "10px 20px 0", display: "flex", flexWrap: "wrap", gap: 7, borderTop: `1px solid ${COLORS.line}`, paddingTop: 14 }}>
-              {QUICK_PROMPTS.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => send(q)}
+            {/* Sidebar */}
+            <div
+              style={{
+                background: COLORS.surfaceAlt,
+                border: `1px solid ${COLORS.line}`,
+                borderRadius: 12,
+                padding: 18,
+                height: isMobile ? 340 : 560,
+                overflowY: "auto",
+                boxSizing: "border-box",
+                minWidth: 0,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                <Package size={15} color={COLORS.ink} />
+                <span
                   style={{
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    fontSize: 12.5,
-                    padding: "7px 12px",
-                    borderRadius: 20,
-                    border: `1px solid ${COLORS.line}`,
-                    background: COLORS.surface,
+                    fontFamily: FONT_MONO,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.1em",
                     color: COLORS.ink,
-                    cursor: "pointer",
+                    textTransform: "uppercase",
                   }}
                 >
-                  {q}
-                </button>
-              ))}
-              <button
-                onClick={() => send(FULL_REPORT_PROMPT)}
-                style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  letterSpacing: "0.03em",
-                  padding: "7px 13px",
-                  borderRadius: 20,
-                  border: `1px solid ${COLORS.ink}`,
-                  background: COLORS.ink,
-                  color: "#F4F1EA",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <FileText size={12} /> Generate Status Report
-              </button>
-            </div>
-            )}
-
-            <div style={{ padding: 16, display: "flex", gap: 8 }}>
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder="Ask a question about your inventory..."
-                style={{
-                  flex: 1,
-                  fontFamily: "'Inter', system-ui, sans-serif",
-                  fontSize: 14,
-                  padding: "11px 14px",
-                  borderRadius: 8,
-                  border: `1px solid ${COLORS.line}`,
-                  outline: "none",
-                  background: COLORS.surface,
-                }}
-              />
-              <button
-                onClick={() => send()}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 8,
-                  border: "none",
-                  background: COLORS.ink,
-                  color: "#F4F1EA",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div
-            style={{
-              background: COLORS.surfaceAlt,
-              border: `1px solid ${COLORS.line}`,
-              borderRadius: 12,
-              padding: 18,
-              height: isMobile ? 340 : 560,
-              overflowY: "auto",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-              <Package size={15} color={COLORS.ink} />
-              <span
-                style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  color: COLORS.ink,
-                  textTransform: "uppercase",
-                }}
-              >
-                Current inventory
-              </span>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <BarcodeStrip />
-            </div>
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <Search
-                size={13}
-                color={COLORS.inkMuted}
-                style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}
-              />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search SKU or name..."
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  fontFamily: "'Inter', system-ui, sans-serif",
-                  fontSize: 12.5,
-                  padding: "8px 10px 8px 30px",
-                  borderRadius: 6,
-                  border: `1px solid ${COLORS.line}`,
-                  outline: "none",
-                  background: COLORS.surface,
-                }}
-              />
-            </div>
-            {inventory
-              .filter((item) => {
-                const q = searchQuery.trim().toLowerCase();
-                if (!q) return true;
-                return item.sku.toLowerCase().includes(q) || item.name.toLowerCase().includes(q);
-              })
-              .map((item) => {
-              const status = statusFor(item);
-              return (
-                <div key={item.sku} style={{ padding: "12px 0", borderBottom: `1px dashed ${COLORS.line}` }}>
+                  {t("currentInventory")} · {formatNumber(lang, items.length)}
+                </span>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <BarcodeStrip />
+              </div>
+              <div style={{ position: "relative", marginBottom: 12 }}>
+                <Search size={13} color={COLORS.inkMuted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  aria-label={t("searchPlaceholder")}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    fontFamily: FONT_BODY,
+                    fontSize: 12.5,
+                    padding: "8px 10px 8px 30px",
+                    borderRadius: 6,
+                    border: `1px solid ${COLORS.line}`,
+                    outline: "none",
+                    background: COLORS.surface,
+                  }}
+                />
+              </div>
+              {visible.length === 0 && <div style={{ fontSize: 12.5, color: COLORS.inkMuted }}>{t("noMatches")}</div>}
+              {visible.map(({ item, index, status }) => (
+                <div key={index} style={{ padding: "12px 0", borderBottom: `1px dashed ${COLORS.line}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8, marginBottom: 4 }}>
-                    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.ink, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>
                       {item.name}
                     </div>
-                    <StatusStamp status={status} />
+                    <StatusStamp status={status} t={t} />
                   </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: COLORS.inkMuted, letterSpacing: "0.03em" }}>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: COLORS.inkMuted, letterSpacing: "0.03em", overflowWrap: "anywhere" }}>
                     {item.sku} · {item.warehouse}
                   </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.ink, marginTop: 4 }}>
-                    STOCK {item.stock} / REORDER {item.reorder_point}
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: COLORS.ink, marginTop: 4 }}>
+                    {t("stockLine", {
+                      stock: formatNumber(lang, item.stock, 2),
+                      reorder: item.reorder_point === null || item.reorder_point === undefined ? "—" : formatNumber(lang, item.reorder_point, 2),
+                    })}
                   </div>
                 </div>
-              );
-            })}
+              ))}
+              {matches.length > visible.length && (
+                <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, color: COLORS.inkMuted, padding: "12px 0 0" }}>
+                  + {formatNumber(lang, matches.length - visible.length)}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         )}
       </div>
+      {modals}
     </div>
   );
 }
