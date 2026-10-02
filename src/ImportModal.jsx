@@ -198,6 +198,8 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
             ))}
           </div>
 
+          {/* Only ask for what the file does not already say */}
+          {(mapping.sales !== null || mapping.lead_time_days === null) && (
           <div
             style={{
               marginTop: 16,
@@ -225,19 +227,23 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
                 {t("importDays")}
               </label>
             )}
-            <label style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {t("importLead")}
-              <input
-                type="number"
-                min="1"
-                max="365"
-                value={lead}
-                onChange={(e) => setLead(e.target.value)}
-                style={{ ...textInput, width: 76, padding: "6px 8px", fontFamily: FONT_MONO }}
-              />
-              {t("importDays")}
-            </label>
+            {mapping.lead_time_days === null && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {t("importLead")}
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={lead}
+                  data-testid="default-lead"
+                  onChange={(e) => setLead(e.target.value)}
+                  style={{ ...textInput, width: 76, padding: "6px 8px", fontFamily: FONT_MONO }}
+                />
+                {t("importDays")}
+              </label>
+            )}
           </div>
+          )}
 
           {(problems.length > 0 || error) && (
             <div role="alert" style={{ color: COLORS.critical, fontSize: 13.5, marginTop: 12, lineHeight: 1.5 }}>
