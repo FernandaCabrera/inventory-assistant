@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock, Search, ArrowLeft } from "lucide-react";
+import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock, Search } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
 import { SURPLUS, SHORTAGE, NEUTRAL, ChartLegend, ChartTip, CycleByZoneChart, ZONE_CHART_LIMIT } from "./CountCharts";
 import { analysisFor } from "./countView";
@@ -8,7 +8,7 @@ import { LOCALES, formatNumber, formatMoney } from "./i18n";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import { conclusions, isoDate, CYCLE_OPTIONS } from "./countLogic";
 import { finding, percent, shortDate, dayMonth, monthYear, monthName, pace, signed } from "./countFormat";
-import { exportCountReport } from "./countExport";
+import { exportCountReport, exportLastCounted } from "./countExport";
 import { COUNT_TABLE_ROWS, COUNT_MAX_LINES, COUNT_EXPORT_NEEDS_PLAN, DEFAULT_CYCLE_DAYS } from "./config";
 
 const card = { background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "18px 18px 16px", minWidth: 0 };
@@ -67,8 +67,10 @@ function DataTable({ title, hint, columns, rows, more, testid }) {
 // How long since each location was counted: the question asked most often of a count report.
 // rows are oldest first. never (locations with no count date) are outside the cycle, so they
 // appear when searched for or when the list is narrowed to what is outside it.
-function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t, tn }) {
+// onExport(rows, details) downloads the list as it stands; locked shows that it needs the plan.
+function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, onExport, locked, lang, t, tn }) {
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [filter, setFilter] = useState("all"); // all | outside | inside | a month such as 2026-06
   const [zone, setZone] = useState(null);
   const [shown, setShown] = useState(COUNT_TABLE_ROWS);
@@ -96,6 +98,19 @@ function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t,
     setShown(COUNT_TABLE_ROWS);
     setZone(null);
   };
+  const filterLabel =
+    filter === "all" ? tn("ccFilterAll")
+    : filter === "outside" ? t("ccFilterOutside", { days: cycleDays })
+    : filter === "inside" ? t("ccFilterInside", { days: cycleDays })
+    : `${t("ccFilterMonth")} ${monthName(lang, filter)}`;
+  async function exportList() {
+    setExporting(true);
+    try {
+      await onExport(matches, { filter: filterLabel, zone, query: query.trim() });
+    } finally {
+      setExporting(false);
+    }
+  }
   const tag = (text, color, background) => (
     <span style={{ ...monoLabel, fontSize: 9.5, color, background, border: `1px solid ${color}`, borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap" }}>{text}</span>
   );
@@ -104,7 +119,18 @@ function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t,
 
   return (
     <div style={card} data-testid="count-last">
-      <div style={{ ...cardTitle, marginBottom: 10 }}>{tn("ccLastTitle")}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ ...cardTitle, marginBottom: 0 }}>{tn("ccLastTitle")}</div>
+        <button
+          onClick={exportList}
+          disabled={exporting || matches.length === 0}
+          data-testid="count-last-export"
+          style={{ ...chipButtonStyle, background: COLORS.ink, color: "#F4F1EA", opacity: matches.length === 0 ? 0.45 : 1, cursor: matches.length === 0 ? "default" : "pointer" }}
+        >
+          {exporting ? <Loader2 size={11} className="ia-spin" /> : locked ? <Lock size={11} /> : <Download size={11} />}
+          {exporting ? t("ccExporting") : `${t("ccLastExport")} · ${formatNumber(lang, matches.length)}`}
+        </button>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: COLORS.ink, flex: "1 1 300px" }}>
           {t("ccFilterLabel")}
@@ -224,8 +250,7 @@ function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t,
 
 // inputs: what the analyst typed ({ total, counted, cycle }). It lives in the parent so it is still
 // there after a visit to the home page or a change of language.
-// onBack: set when the visitor came from their inventory, to go straight back to it
-export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onHome, onBack, onReplace, onUpgrade }) {
+export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onHome, onReplace, onUpgrade }) {
   const isMobile = useIsMobile();
   const isSample = data.source === "sample";
   const totalLocations = inputs.total;
@@ -248,8 +273,19 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
   // a file counted by product, with no locations, gets the same sentences about products
   const tn = (key, vars) => t(a.hasLocations ? key : `${key}P`, vars);
 
+  // Downloads need the plan for one's own report; the example downloads freely
+  const locked = COUNT_EXPORT_NEEDS_PLAN && !paid && !isSample;
+
+  async function downloadList(rows, details) {
+    if (locked) {
+      onUpgrade("counts");
+      return;
+    }
+    await exportLastCounted({ rows, details, analysis: a, lang, t, fileName: data.fileName });
+  }
+
   async function download() {
-    if (COUNT_EXPORT_NEEDS_PLAN && !paid && !isSample) {
+    if (locked) {
       onUpgrade("counts");
       return;
     }
@@ -327,11 +363,6 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
         <button onClick={onHome} style={chipButtonStyle} data-testid="home">
           <Home size={11} /> {t("home")}
         </button>
-        {onBack && (
-          <button onClick={onBack} style={chipButtonStyle} data-testid="count-back">
-            <ArrowLeft size={11} /> {t("ccBackToInventory")}
-          </button>
-        )}
         <span style={chipStyle}>
           <FileSpreadsheet size={11} style={{ flexShrink: 0 }} />
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{data.fileName}</span>
@@ -349,7 +380,7 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
           <Upload size={11} /> {isSample ? t("ccSampleUpload") : t("ccReplace")}
         </button>
         <button onClick={download} disabled={exporting} style={{ ...chipButtonStyle, background: COLORS.ink, color: "#F4F1EA" }} data-testid="count-export">
-          {exporting ? <Loader2 size={11} className="ia-spin" /> : COUNT_EXPORT_NEEDS_PLAN && !paid && !isSample ? <Lock size={11} /> : <Download size={11} />}
+          {exporting ? <Loader2 size={11} className="ia-spin" /> : locked ? <Lock size={11} /> : <Download size={11} />}
           {exporting ? t("ccExporting") : t("ccExport")}
         </button>
       </div>
@@ -552,7 +583,19 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                 ]}
               />
             )}
-            <LastCountCard rows={a.lastCounted} never={a.aging.neverList} asOf={a.asOf} cycleDays={a.cycle.days} hasZones={a.hasLocations} notes={[]} lang={lang} t={t} tn={tn} />
+            <LastCountCard
+              rows={a.lastCounted}
+              never={a.aging.neverList}
+              asOf={a.asOf}
+              cycleDays={a.cycle.days}
+              hasZones={a.hasLocations}
+              notes={[]}
+              onExport={downloadList}
+              locked={locked}
+              lang={lang}
+              t={t}
+              tn={tn}
+            />
             {a.aging.neverList.length > 0 && (
               <div style={card} data-testid="count-never">
                 <div style={cardTitle}>
@@ -606,6 +649,8 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                 asOf={a.asOf}
                 cycleDays={a.cycle.days}
                 hasZones={a.hasLocations}
+                onExport={downloadList}
+                locked={locked}
                 notes={[tn("ccLastOnlyFile"), a.notInFile > 0 ? t("ccLastMissing", { n: num(a.notInFile) }) : ""].filter(Boolean)}
                 lang={lang}
                 t={t}
