@@ -189,6 +189,18 @@ describe("a detailed count report", () => {
       "ccRepeat", "ccPace", "ccLag", "ccUnposted",
     ]);
   });
+  test("how long since each location was counted, oldest first", () => {
+    expect(a.lastCounted.map((l) => [l.location, l.daysSince])).toEqual([["10-A01A1", 7], ["10-B02A1", 7], ["10-A01A2", 0], ["10-A01A3", 0]]);
+    expect(a.notInFile).toBeNull();
+
+    const later = analyzeCounts(lines, { asOf: day("2026-04-08"), totalLocations: 40 });
+    expect(later.lastCounted[0]).toEqual({ warehouse: "W1", location: "10-A01A1", zone: "10-A", last: day("2026-03-02"), daysSince: 37, overdue: null });
+    expect(later.lastCounted[3].daysSince).toBe(30);
+    expect(later.notInFile).toBe(36);
+    const said = conclusions(later).flat().find((part) => part.key === "ccOldestInFile");
+    expect(said.vars).toEqual({ location: "10-A01A1", days: 37, date: day("2026-04-08") });
+    expect(keys(conclusions(a))).not.toContain("ccOldestInFile"); // a week is not worth a sentence
+  });
 });
 
 describe("a report that lists only the adjustments", () => {
@@ -209,6 +221,10 @@ describe("a report that lists only the adjustments", () => {
     expect(a.absUnits).toBe(14);
     expect(a.netUnits).toBe(-8);
     expect(keys(conclusions(a))).toEqual(["ccAdjustments", "ccUnits", "ccReasonLines", "ccNoReason", "ccZoneShare"]);
+  });
+
+  test("cannot say when a location was last counted", () => {
+    expect(analyzeCounts(lines, { asOf: day("2026-12-01") }).lastCounted).toEqual([]);
   });
 
   test("works out accuracy once the number of locations counted is typed in", () => {
@@ -250,6 +266,9 @@ describe("a list of locations with the date of their last count", () => {
     expect(a.aging.overdue).toBe(4);
     expect(a.aging.compliance).toBeCloseTo(3 / 7);
     expect(a.aging.oldest[0]).toMatchObject({ location: "B-02-2", daysSince: 487, overdue: true });
+    expect(a.lastCounted.map((l) => [l.location, l.daysSince, l.overdue])).toEqual([
+      ["B-02-2", 487, true], ["B-01-1", 214, true], ["A-02-1", 73, false], ["A-01-2", 21, false], ["A-01-1", 3, false],
+    ]);
   });
 
   test("the pace needed to keep the cycle", () => {

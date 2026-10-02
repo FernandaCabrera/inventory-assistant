@@ -635,6 +635,18 @@ export function analyzeCounts(lines, options = {}) {
   // Coverage: how much of the warehouse has been counted
   const asOf = lines.length ? Math.max(options.asOf ?? to, to) : null;
   const cycleDays = typed(options.cycleDays) || 90;
+
+  // How long since each location was last counted, oldest first. An adjustment report cannot
+  // say: it only has the dates on which something was corrected.
+  const lastCounted =
+    mode === "adjustments"
+      ? []
+      : [...locations.values()]
+          .map((loc) => {
+            const daysSince = Math.round((asOf - loc.last) / DAY);
+            return { warehouse: loc.warehouse, location: loc.location, zone: loc.zone, last: loc.last, daysSince, overdue: mode === "coverage" ? daysSince > cycleDays : null };
+          })
+          .sort((a, b) => a.last - b.last);
   let coverage = null;
   let totalLocations = null;
   let aging = null;
@@ -647,7 +659,6 @@ export function analyzeCounts(lines, options = {}) {
     const zoneFor = (name) => bump(zoneAging, name, () => ({ zone: name, locations: 0, overdue: 0, never: 0, oldest: 0 }));
     let onTime = 0;
     let recent = 0;
-    const dated = [];
     locations.forEach((loc) => {
       const age = Math.round((asOf - loc.last) / DAY);
       bands.find((band) => age <= band.to).locations += 1;
@@ -658,7 +669,6 @@ export function analyzeCounts(lines, options = {}) {
       zone.locations += 1;
       if (late) zone.overdue += 1;
       zone.oldest = Math.max(zone.oldest, age);
-      dated.push({ warehouse: loc.warehouse, location: loc.location, zone: loc.zone, last: loc.last, daysSince: age, overdue: late });
     });
     neverKeys.forEach((u) => {
       const zone = zoneFor(u.zone);
@@ -666,7 +676,6 @@ export function analyzeCounts(lines, options = {}) {
       zone.overdue += 1;
       zone.never += 1;
     });
-    dated.sort((a, b) => a.last - b.last);
     coverage = ratio(onTime, totalLocations);
     aging = {
       asOf,
@@ -679,7 +688,7 @@ export function analyzeCounts(lines, options = {}) {
       compliance: coverage,
       perWeek: recent / 4,
       needed: totalLocations / (cycleDays / 7),
-      oldest: dated,
+      oldest: lastCounted,
       zones: hasLocations
         ? [...zoneAging.values()]
             .map((z) => ({ ...z, compliance: ratio(z.locations - z.overdue, z.locations) }))
@@ -741,6 +750,10 @@ export function analyzeCounts(lines, options = {}) {
       .map((c) => ({ counter: c.counter, lines: c.lines, off: c.off, locations: c.locations.size, days: c.days.size }))
       .sort((a, b) => b.lines - a.lines),
     coverage,
+    asOf,
+    lastCounted,
+    // locations of the warehouse that the file does not mention at all
+    notInFile: mode === "detail" && hasLocations && typedTotal ? typedTotal - locations.size : null,
     totalLocations,
     totalFloor,
     totalTooSmall,
@@ -843,6 +856,9 @@ export function conclusions(a) {
       );
     } else if (a.hasLocations && a.perWeek > 0) {
       say({ key: "ccPace", vars: { n: a.locationsCounted, perWeek: a.perWeek } });
+    }
+    if (a.hasLocations && a.lastCounted.length > 1 && a.lastCounted[0].daysSince >= 30) {
+      say({ key: "ccOldestInFile", vars: { location: a.lastCounted[0].location, days: a.lastCounted[0].daysSince, date: a.asOf } });
     }
     // only against the month right before: a gap in between is not a trend
     const months = a.months.filter((m) => m.accuracy !== null);
