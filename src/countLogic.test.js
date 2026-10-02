@@ -194,12 +194,27 @@ describe("a detailed count report", () => {
     expect(a.notInFile).toBeNull();
 
     const later = analyzeCounts(lines, { asOf: day("2026-04-08"), totalLocations: 40 });
-    expect(later.lastCounted[0]).toEqual({ warehouse: "W1", location: "10-A01A1", zone: "10-A", last: day("2026-03-02"), daysSince: 37, overdue: null });
+    expect(later.lastCounted[0]).toEqual({ warehouse: "W1", location: "10-A01A1", zone: "10-A", last: day("2026-03-02"), daysSince: 37, overdue: false });
     expect(later.lastCounted[3].daysSince).toBe(30);
     expect(later.notInFile).toBe(36);
     const said = conclusions(later).flat().find((part) => part.key === "ccOldestInFile");
     expect(said.vars).toEqual({ location: "10-A01A1", days: 37, date: day("2026-04-08") });
     expect(keys(conclusions(a))).not.toContain("ccOldestInFile"); // a week is not worth a sentence
+  });
+
+  test("where to count: the locations in the file against the cycle, by area", () => {
+    const monthly = analyzeCounts(lines, { asOf: day("2026-04-08"), cycleDays: 30 });
+    expect(monthly.lastCounted.map((l) => l.overdue)).toEqual([true, true, false, false]); // 37 days, 37, 30, 30
+    expect(monthly.cycle).toMatchObject({ days: 30, locations: 4, overdue: 2, compliance: 0.5 });
+    expect(monthly.cycle.zones).toEqual([
+      { zone: "10-B", locations: 1, overdue: 1, never: 0, oldest: 37, compliance: 0 },
+      { zone: "10-A", locations: 3, overdue: 1, never: 0, oldest: 37, compliance: 2 / 3 },
+    ]);
+    expect(conclusions(monthly).flat().find((part) => part.key === "ccOverdueInFile").vars).toEqual({ n: 2, cycle: 30 });
+
+    const quarterly = analyzeCounts(lines, { asOf: day("2026-04-08"), cycleDays: 90 });
+    expect(quarterly.cycle.overdue).toBe(0);
+    expect(keys(conclusions(quarterly))).not.toContain("ccOverdueInFile");
   });
 });
 
@@ -224,7 +239,9 @@ describe("a report that lists only the adjustments", () => {
   });
 
   test("cannot say when a location was last counted", () => {
-    expect(analyzeCounts(lines, { asOf: day("2026-12-01") }).lastCounted).toEqual([]);
+    const a = analyzeCounts(lines, { asOf: day("2026-12-01") });
+    expect(a.lastCounted).toEqual([]);
+    expect(a.cycle).toBeNull();
   });
 
   test("works out accuracy once the number of locations counted is typed in", () => {
@@ -275,6 +292,8 @@ describe("a list of locations with the date of their last count", () => {
     expect(a.aging.perWeek).toBeCloseTo(0.5); // two locations in the last four weeks
     expect(a.aging.needed).toBeCloseTo(7 / (90 / 7));
     expect(a.aging.zones[0]).toMatchObject({ zone: "B", locations: 4, overdue: 4, never: 2 });
+    expect(a.cycle).toMatchObject({ days: 90, locations: 7, overdue: 4 });
+    expect(a.cycle.zones).toBe(a.aging.zones); // the same figures feed the chart, the table and the dashboard
   });
 
   test("locations the file does not list can be added by typing the total", () => {

@@ -1,18 +1,15 @@
 import { useMemo, useState } from "react";
-import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock, Search } from "lucide-react";
+import { Home, FileSpreadsheet, CalendarDays, ShieldCheck, Upload, Download, Loader2, Lock, Search, ArrowLeft } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
+import { SURPLUS, SHORTAGE, NEUTRAL, ChartLegend, ChartTip, CycleByZoneChart, ZONE_CHART_LIMIT } from "./CountCharts";
+import { analysisFor } from "./countView";
 import { COLORS, FONT_MONO, FONT_HEAD, FONT_BODY, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
 import { LOCALES, formatNumber, formatMoney } from "./i18n";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
-import { analyzeCounts, conclusions, CYCLE_OPTIONS } from "./countLogic";
-import { finding, percent, shortDate, dayMonth, monthYear, pace, signed } from "./countFormat";
+import { conclusions, isoDate, CYCLE_OPTIONS } from "./countLogic";
+import { finding, percent, shortDate, dayMonth, monthYear, monthName, pace, signed } from "./countFormat";
 import { exportCountReport } from "./countExport";
 import { COUNT_TABLE_ROWS, COUNT_MAX_LINES, COUNT_EXPORT_NEEDS_PLAN, DEFAULT_CYCLE_DAYS } from "./config";
-
-// Chart colors. Surplus and shortage are a pair checked for color-blind readers on a white card.
-const SURPLUS = "#2F6DB5";
-const SHORTAGE = "#C1431F";
-const NEUTRAL = "#3D4744";
 
 const card = { background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "18px 18px 16px", minWidth: 0 };
 const cardTitle = { ...monoLabel, color: COLORS.ink, marginBottom: 6 };
@@ -67,49 +64,118 @@ function DataTable({ title, hint, columns, rows, more, testid }) {
   );
 }
 
-// How long since each location was counted, with a search box: the question asked most often.
-// rows are oldest first. never (locations with no count date) only show up when searched for.
-function LastCountCard({ rows, never, asOf, withStatus, notes, lang, t, tn }) {
+// How long since each location was counted: the question asked most often of a count report.
+// rows are oldest first. never (locations with no count date) are outside the cycle, so they
+// appear when searched for or when the list is narrowed to what is outside it.
+function LastCountCard({ rows, never, asOf, cycleDays, hasZones, notes, lang, t, tn }) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all"); // all | outside | inside | a month such as 2026-06
+  const [zone, setZone] = useState(null);
   const [shown, setShown] = useState(COUNT_TABLE_ROWS);
   const wanted = query.trim().toLowerCase();
   const name = (row) => (row.warehouse ? `${row.warehouse} · ${row.location}` : row.location);
-  const matches = wanted
-    ? [...never.map((row) => ({ ...row, last: null })), ...rows].filter((row) => name(row).toLowerCase().includes(wanted))
-    : rows;
+  const monthOf = (row) => isoDate(row.last).slice(0, 7);
+  const months = [...new Set(rows.map(monthOf))].sort().reverse();
+  const narrowed = wanted !== "" || filter !== "all";
+
+  const neverRows = never.map((row) => ({ ...row, last: null, overdue: true }));
+  let pool = wanted || filter === "outside" ? [...neverRows, ...rows] : rows;
+  if (wanted) pool = pool.filter((row) => name(row).toLowerCase().includes(wanted));
+  if (filter === "outside") pool = pool.filter((row) => row.overdue);
+  else if (filter === "inside") pool = pool.filter((row) => !row.overdue);
+  else if (filter !== "all") pool = pool.filter((row) => row.last !== null && monthOf(row) === filter);
+
+  // which part of the warehouse the listed locations are in
+  const byZone = new Map();
+  pool.forEach((row) => byZone.set(row.zone, (byZone.get(row.zone) || 0) + 1));
+  const zoneCounts = [...byZone.entries()].sort((a, b) => b[1] - a[1]);
+  const matches = zone === null ? pool : pool.filter((row) => row.zone === zone);
   const visible = matches.slice(0, shown);
+
+  const restart = () => {
+    setShown(COUNT_TABLE_ROWS);
+    setZone(null);
+  };
   const tag = (text, color, background) => (
     <span style={{ ...monoLabel, fontSize: 9.5, color, background, border: `1px solid ${color}`, borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap" }}>{text}</span>
   );
   const cell = { ...td, whiteSpace: "nowrap" };
+  const control = { ...textInput, fontFamily: FONT_BODY, fontSize: 13, padding: "8px 10px" };
 
   return (
     <div style={card} data-testid="count-last">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-        <div style={{ ...cardTitle, marginBottom: 0 }}>{tn("ccLastTitle")}</div>
-        <div style={{ position: "relative", flex: "0 1 260px" }}>
+      <div style={{ ...cardTitle, marginBottom: 10 }}>{tn("ccLastTitle")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: COLORS.ink, flex: "1 1 300px" }}>
+          {t("ccFilterLabel")}
+          <select
+            value={filter}
+            data-testid="count-last-filter"
+            onChange={(e) => {
+              setFilter(e.target.value);
+              restart();
+            }}
+            style={{ ...control, flex: 1, width: "auto", minWidth: 0 }}
+          >
+            <option value="all">{tn("ccFilterAll")}</option>
+            <option value="outside">{t("ccFilterOutside", { days: cycleDays })}</option>
+            <option value="inside">{t("ccFilterInside", { days: cycleDays })}</option>
+            <optgroup label={t("ccFilterMonth")}>
+              {months.map((month) => (
+                <option key={month} value={month}>
+                  {monthName(lang, month)}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+        <div style={{ position: "relative", flex: "1 1 220px" }}>
           <Search size={13} color={COLORS.inkMuted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
           <input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setShown(COUNT_TABLE_ROWS);
+              restart();
             }}
             placeholder={tn("ccLastSearch")}
             aria-label={tn("ccLastSearch")}
             data-testid="count-last-search"
-            style={{ ...textInput, fontFamily: FONT_BODY, fontSize: 13, padding: "8px 10px 8px 30px" }}
+            style={{ ...control, paddingLeft: 30 }}
           />
         </div>
       </div>
       <p style={hintText}>
         {t("ccLastAsOf", { date: shortDate(lang, asOf) })} {notes.join(" ")}
       </p>
-      {wanted && (
+
+      {narrowed && (
         <p style={{ ...hintText, color: COLORS.ink }} data-testid="count-last-matches">
-          {matches.length > 0 ? t("ccLastMatches", { n: formatNumber(lang, matches.length) }) : t("ccLastNone")}
+          {pool.length > 0 ? t("ccLastMatches", { n: formatNumber(lang, pool.length) }) : t("ccLastNone")}
         </p>
       )}
+      {narrowed && hasZones && zoneCounts.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "0 0 12px" }} data-testid="count-last-zones">
+          <span style={{ fontSize: 12.5, color: COLORS.inkMuted, marginRight: 2 }}>{t("ccWhere")}</span>
+          {zoneCounts.slice(0, 14).map(([zoneName, count]) => {
+            const on = zone === zoneName;
+            return (
+              <button
+                key={zoneName}
+                onClick={() => {
+                  setZone(on ? null : zoneName);
+                  setShown(COUNT_TABLE_ROWS);
+                }}
+                aria-pressed={on}
+                style={{ ...chipButtonStyle, textTransform: "none", background: on ? COLORS.ink : "none", color: on ? "#F4F1EA" : COLORS.ink }}
+              >
+                {zoneName || "—"} · {formatNumber(lang, count)}
+              </button>
+            );
+          })}
+          {zoneCounts.length > 14 && <span style={{ fontSize: 12.5, color: COLORS.inkMuted }}>{t("ccAndMore", { n: formatNumber(lang, zoneCounts.length - 14) })}</span>}
+        </div>
+      )}
+
       {visible.length > 0 && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -118,7 +184,7 @@ function LastCountCard({ rows, never, asOf, withStatus, notes, lang, t, tn }) {
                 <th style={{ ...th, textAlign: "left" }}>{tn("ccColLocation")}</th>
                 <th style={{ ...th, textAlign: "left" }}>{t("ccColLast")}</th>
                 <th style={{ ...th, textAlign: "right" }}>{t("ccColSince")}</th>
-                {withStatus && <th style={{ ...th, textAlign: "left" }}>{t("ccColStatus")}</th>}
+                <th style={{ ...th, textAlign: "left" }}>{t("ccColStatus")}</th>
               </tr>
             </thead>
             <tbody>
@@ -129,15 +195,13 @@ function LastCountCard({ rows, never, asOf, withStatus, notes, lang, t, tn }) {
                   <td style={{ ...cell, textAlign: "right", fontFamily: FONT_MONO, fontSize: 12.5, fontWeight: 600 }}>
                     {row.last === null ? "—" : formatNumber(lang, row.daysSince)}
                   </td>
-                  {withStatus && (
-                    <td style={cell}>
-                      {row.last === null
-                        ? tag(t("ccLastNever"), COLORS.critical, COLORS.criticalBg)
-                        : row.overdue
-                        ? tag(t("ccOutside"), COLORS.critical, COLORS.criticalBg)
-                        : tag(t("ccWithin"), COLORS.ok, COLORS.okBg)}
-                    </td>
-                  )}
+                  <td style={cell}>
+                    {row.last === null
+                      ? tag(t("ccLastNever"), COLORS.critical, COLORS.criticalBg)
+                      : row.overdue
+                      ? tag(t("ccOutside"), COLORS.critical, COLORS.criticalBg)
+                      : tag(t("ccWithin"), COLORS.ok, COLORS.okBg)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -158,40 +222,10 @@ function LastCountCard({ rows, never, asOf, withStatus, notes, lang, t, tn }) {
   );
 }
 
-function ChartLegend({ items }) {
-  return (
-    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: COLORS.ink, margin: "-4px 0 10px" }}>
-      {items.map((item) => (
-        <span key={item.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color }} />
-          {item.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// What shows when the pointer is over a bar. Text stays in ink; the swatch carries the color.
-function ChartTip({ active, payload, label, format }) {
-  if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0].payload || {};
-  return (
-    <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "8px 11px", fontSize: 12, color: COLORS.ink, boxShadow: "0 4px 14px rgba(21, 24, 26, 0.10)" }}>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{point.full || label}</div>
-      {payload.map((entry) => (
-        <div key={entry.dataKey} style={{ display: "flex", alignItems: "center", gap: 7, lineHeight: 1.7 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 2, background: point.color || entry.color, flexShrink: 0 }} />
-          <span style={{ color: COLORS.inkMuted }}>{entry.name}</span>
-          <span style={{ fontFamily: FONT_MONO, marginLeft: "auto", paddingLeft: 14 }}>{format(entry.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // inputs: what the analyst typed ({ total, counted, cycle }). It lives in the parent so it is still
 // there after a visit to the home page or a change of language.
-export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onHome, onReplace, onUpgrade }) {
+// onBack: set when the visitor came from their inventory, to go straight back to it
+export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onHome, onBack, onReplace, onUpgrade }) {
   const isMobile = useIsMobile();
   const isSample = data.source === "sample";
   const totalLocations = inputs.total;
@@ -202,16 +236,7 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
   const setCycleDays = (cycle) => onInputs({ ...inputs, cycle });
   const [exporting, setExporting] = useState(false);
 
-  const a = useMemo(() => {
-    const now = new Date();
-    return analyzeCounts(data.lines, {
-      undated: data.undated,
-      totalLocations,
-      countedLocations,
-      cycleDays,
-      asOf: isSample ? undefined : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
-    });
-  }, [data, totalLocations, countedLocations, cycleDays, isSample]);
+  const a = useMemo(() => analysisFor(data, inputs), [data, inputs]);
   const findings = useMemo(() => conclusions(a).map((parts) => finding(t, lang, parts)), [a, t, lang]);
 
   const num = (value, decimals = 0) => formatNumber(lang, value, decimals);
@@ -302,6 +327,11 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
         <button onClick={onHome} style={chipButtonStyle} data-testid="home">
           <Home size={11} /> {t("home")}
         </button>
+        {onBack && (
+          <button onClick={onBack} style={chipButtonStyle} data-testid="count-back">
+            <ArrowLeft size={11} /> {t("ccBackToInventory")}
+          </button>
+        )}
         <span style={chipStyle}>
           <FileSpreadsheet size={11} style={{ flexShrink: 0 }} />
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{data.fileName}</span>
@@ -339,22 +369,23 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
         )}
         {notes.length > 0 && <div style={{ fontSize: 12.5, color: COLORS.inkMuted, lineHeight: 1.6 }}>{notes.join(" ")}</div>}
 
-        {/* What the file cannot say on its own. A file with no locations has nothing to ask outside the cycle. */}
-        {(coverageMode || a.hasLocations) && (
-        <div style={{ ...card, display: "flex", gap: "12px 28px", flexWrap: "wrap", padding: "14px 18px" }}>
-          {coverageMode ? (
+        {/* What the file cannot say on its own: the counting cycle and the size of the warehouse */}
+        {(a.cycle !== null || a.hasLocations) && (
+        <div style={{ ...card, display: "flex", gap: "12px 28px", flexWrap: "wrap", padding: "14px 18px" }} data-testid="count-settings">
+          {a.cycle !== null && (
             <label style={fieldLabel}>
-              {tn("ccCycleBefore")}
-              <select value={String(cycleDays)} data-testid="count-cycle" onChange={(e) => setCycleDays(Number(e.target.value))} style={{ ...field, width: 84 }}>
+              <span>
+                <strong>{t("ccCycleTitle")}:</strong> {tn("ccCycleBefore")}
+              </span>
+              <select value={String(cycleDays)} data-testid="count-cycle" onChange={(e) => setCycleDays(Number(e.target.value))} style={{ ...field, width: "auto", fontFamily: FONT_BODY }}>
                 {CYCLE_OPTIONS.map((days) => (
                   <option key={days} value={String(days)}>
-                    {days}
+                    {t(`ccCycleOpt_${days}`)}
                   </option>
                 ))}
               </select>
-              {t("ccCycleAfter")}
             </label>
-          ) : null}
+          )}
           {coverageMode ? (
             numberInput(totalLocations, setTotalLocations, tn("ccTotalLabel"), t("ccTotalHintList"), "count-total", totalProblem)
           ) : (
@@ -495,6 +526,16 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
 
         {coverageMode ? (
           <>
+            {a.cycle !== null && a.cycle.zones.length > 1 && (
+              <div style={card} data-testid="count-where">
+                <div style={cardTitle}>{t("ccChartWhere", { days: a.cycle.days })}</div>
+                <p style={hintText}>
+                  {coverageMode ? t("ccZonesHint") : `${t("ccZonesHint")} ${t("ccLastOnlyFile")}`}
+                  {a.cycle.zones.length > ZONE_CHART_LIMIT ? ` ${t("ccChartWhereTop", { n: ZONE_CHART_LIMIT })}` : ""}
+                </p>
+                <CycleByZoneChart zones={a.cycle.zones} lang={lang} t={t} />
+              </div>
+            )}
             {a.aging.zones.length > 1 && (
               <DataTable
                 testid="count-aging-zones"
@@ -511,7 +552,7 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                 ]}
               />
             )}
-            <LastCountCard rows={a.lastCounted} never={a.aging.neverList} asOf={a.asOf} withStatus notes={[]} lang={lang} t={t} tn={tn} />
+            <LastCountCard rows={a.lastCounted} never={a.aging.neverList} asOf={a.asOf} cycleDays={a.cycle.days} hasZones={a.hasLocations} notes={[]} lang={lang} t={t} tn={tn} />
             {a.aging.neverList.length > 0 && (
               <div style={card} data-testid="count-never">
                 <div style={cardTitle}>
@@ -548,12 +589,23 @@ export default function CycleCounts({ data, inputs, onInputs, lang, t, paid, onH
                 ]}
               />
             )}
+            {a.cycle !== null && a.cycle.zones.length > 1 && (
+              <div style={card} data-testid="count-where">
+                <div style={cardTitle}>{t("ccChartWhere", { days: a.cycle.days })}</div>
+                <p style={hintText}>
+                  {coverageMode ? t("ccZonesHint") : `${t("ccZonesHint")} ${t("ccLastOnlyFile")}`}
+                  {a.cycle.zones.length > ZONE_CHART_LIMIT ? ` ${t("ccChartWhereTop", { n: ZONE_CHART_LIMIT })}` : ""}
+                </p>
+                <CycleByZoneChart zones={a.cycle.zones} lang={lang} t={t} />
+              </div>
+            )}
             {a.lastCounted.length > 0 && (
               <LastCountCard
                 rows={a.lastCounted}
                 never={[]}
                 asOf={a.asOf}
-                withStatus={false}
+                cycleDays={a.cycle.days}
+                hasZones={a.hasLocations}
                 notes={[tn("ccLastOnlyFile"), a.notInFile > 0 ? t("ccLastMissing", { n: num(a.notInFile) }) : ""].filter(Boolean)}
                 lang={lang}
                 t={t}

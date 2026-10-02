@@ -99,10 +99,24 @@ export async function exportCountReport({ analysis: a, findings, lang, t, fileNa
       { header: t("ccColZone"), width: 12, value: (o) => o.zone },
       { header: t("ccColLast"), width: 16, value: (o) => new Date(o.last), format: "yyyy-mm-dd" },
       { header: `${t("ccColSince")} (${shortDate(lang, a.asOf)})`, width: 30, value: (o) => o.daysSince },
-      ...(coverage ? [{ header: t("ccKpiOverdue"), width: 16, value: (o) => (o.overdue ? "✓" : "") }] : []),
+      { header: `${t("ccColStatus")} (${t(`ccCycleOpt_${a.cycle ? a.cycle.days : 90}`)})`, width: 34, value: (o) => (o.overdue ? t("ccOutside") : t("ccWithin")) },
     ],
     a.lastCounted
   );
+  // Where to count: per area, what is outside the cycle. A list of locations has its own sheet for this below.
+  if (!coverage && a.cycle) {
+    addTable(
+      workbook,
+      t("xlsCcWhere"),
+      [
+        { header: t("ccColZone"), width: 14, value: (z) => z.zone },
+        { header: t("ccColLocations"), width: 14, value: (z) => z.locations },
+        { header: t("ccColOutside"), width: 16, value: (z) => z.overdue },
+        { header: t("ccColOnTime"), width: 12, value: (z) => share(z.compliance), format: PCT },
+      ],
+      a.cycle.zones.length > 1 ? a.cycle.zones : []
+    );
+  }
 
   if (coverage) {
     addTable(
