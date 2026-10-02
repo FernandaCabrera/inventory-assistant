@@ -95,7 +95,9 @@ You will be given the current inventory dataset as JSON and a question.
 THE DATA:
 - Each record has: sku, name, warehouse, stock (units on hand), reorder_point, lead_time_days,
   avg_daily_usage (units per day, from recent sales) and sometimes unit_cost (cost per unit, in the
-  business's own currency).
+  business's own currency) and on_order (units already ordered from the supplier and not yet received).
+- When on_order is present, count it before recommending a new order: what matters is stock + on_order
+  against the reorder point. Say when a product is low but an order is already on its way.
 - A field that is missing from a record is unknown — say so rather than assuming a value.
 - avg_daily_usage of 0 with stock above 0 means the product did not sell in the period: that stock is
   capital tied up. Never recommend reordering it; recommend what to do with it (hold purchases, promote,
@@ -208,7 +210,7 @@ function sanitizeInventory(inventory) {
 }
 
 // Second layer: only the fields the analysis uses go to the AI, whatever the browser sent.
-const ITEM_FIELDS = ["sku", "name", "warehouse", "stock", "reorder_point", "lead_time_days", "avg_daily_usage", "unit_cost"];
+const ITEM_FIELDS = ["sku", "name", "warehouse", "stock", "reorder_point", "lead_time_days", "avg_daily_usage", "unit_cost", "on_order"];
 
 function compactItem(item) {
   const out = {};
@@ -336,6 +338,11 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+// The page calls this when it opens, so a sleeping server is awake by the time the visitor asks something.
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true });
+});
+
 // The AI's instructions are private by default. Set EXPOSE_SYSTEM_PROMPT=true (together with
 // SHOW_PROMPT in src/config.js) to show them in the app, e.g. for a demo.
 app.get("/api/system-prompt", (req, res) => {
@@ -368,7 +375,12 @@ function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
-const REASONS = { upload: "wanted to load another file", questions: "ran out of free questions", dashboard: "wanted the dashboard" };
+const REASONS = {
+  upload: "wanted to load another file",
+  questions: "ran out of free questions",
+  dashboard: "wanted the dashboard",
+  orders: "wanted the full order list",
+};
 
 app.post("/api/upgrade-request", async (req, res) => {
   const body = req.body || {};

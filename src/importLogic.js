@@ -13,6 +13,7 @@ export const FIELDS = [
   "reorder_point",
   "lead_time_days",
   "unit_cost",
+  "on_order",
 ];
 
 // lowercase, no accents, punctuation -> spaces
@@ -42,12 +43,19 @@ const EXACT = {
   reorder_point: ["reorder point", "punto de reorden", "punto de pedido", "stock minimo", "minimo", "min stock"],
   lead_time_days: ["lead time", "lead time days", "dias de reposicion", "tiempo de reposicion"],
   unit_cost: ["costo", "costo unitario", "cost", "unit cost"],
+  on_order: ["on order", "open po qty", "open po", "in transit", "en transito", "por recibir", "unidades pedidas"],
 };
 
 // Looser matching, checked in this order: specific fields first so that
 // "stock minimo" is the reorder point and "unidades vendidas" is sales, not stock.
 const LOOSE = [
   ["avg_daily_usage", /(diari|daily|por dia|per day)/, null],
+  [
+    "on_order",
+    // units already ordered from the supplier and not yet received
+    /(open po|on order|in transit|en transito|por recibir|por llegar|pendiente de (recibir|recepcion)|oc (abierta|pendiente)|pedidos? pendientes?|qty ordered|unidades pedidas|ya pedid)/,
+    /(date|fecha|value|valor|cost|costo)/,
+  ],
   [
     "reorder_point",
     /(reorden|reorder|punto de (pedido|reposicion)|\bmin(imo|imum)?\b)/,
@@ -362,6 +370,8 @@ export function buildInventory(table, mapping, settings) {
     };
     const cost = parseNumber(at(row, "unit_cost"));
     if (cost !== null && cost > 0) item.unit_cost = cost;
+    const onOrder = parseNumber(at(row, "on_order"));
+    if (onOrder !== null && onOrder > 0) item.on_order = onOrder;
 
     items.push(item);
     report.read += 1;

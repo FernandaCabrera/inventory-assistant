@@ -104,6 +104,7 @@ const STRINGS = {
     planReasonDashboard: "The dashboard is part of the plan.",
     planIncludes: "What the plan includes",
     planItems: [
+      "Full order list with quantities, downloadable in Excel",
       "Dashboard with charts by status, warehouse and days of cover",
       "Capital tied up in stock that is not selling",
       "Upload an updated file whenever you need",
@@ -153,6 +154,96 @@ const STRINGS = {
     field_reorder_point: "Minimum stock / reorder point",
     field_lead_time_days: "Lead time (days)",
     field_unit_cost: "Unit cost",
+
+    field_on_order: "Units already on order",
+
+    tabOrders: "Order list",
+    summaryRunOut: "Running out first",
+    summaryRunOutHint: "Days of stock left",
+    summaryRunOutNone: "Nothing is close to running out.",
+    summaryToOrder: "To order today",
+    summaryToOrderHint: "Products that need a new order",
+    summaryToOrderCost: "Estimated order: {amount}",
+    summaryToOrderNone: "Nothing to order today.",
+    summaryOpenOrders: "See the order list",
+    summaryNotMoving: "Not moving",
+    summaryNotMovingHint: "Products with no sales or with excess stock",
+    summaryTiedUp: "Capital tied up: {amount}",
+    summaryTiedUpLocked: "Unlock the dashboard to see how much capital that is.",
+    summaryOpenDashboard: "See the dashboard",
+    daysShort: "{n} d",
+
+    ordersTitle: "What to order today",
+    ordersCoverBefore: "Each order should cover",
+    ordersCoverAfter: "days of sales",
+    ordersRule:
+      "A product is listed when its stock, plus what is already on order, is below its reorder point. Quantity = reorder point + {days} days of sales − stock − units on order.",
+    ordersRuleMinimum: "Products without sales data are refilled up to twice their minimum stock.",
+    ordersDisclaimer: "These are estimates from your file. Check them before you buy.",
+    ordersEmpty: "Nothing to order today: no product is below its reorder point.",
+    colProduct: "Product",
+    colStock: "Stock",
+    colCover: "Days of cover",
+    colLead: "Lead time (days)",
+    colOnOrder: "On order",
+    colQty: "Order",
+    colCost: "Order cost",
+    ordersLate: "Runs out before a new order arrives",
+    ordersTotal: "Total",
+    ordersTotalProducts: "Products: {n}",
+    ordersExport: "Download order list (Excel)",
+    ordersLockedMore: "More products on the list: {n}. The full list and the Excel download are part of the plan.",
+    ordersUnlock: "Unlock the full list",
+    planReasonOrders: "The full order list and its Excel download are part of the plan.",
+    planPrice: "Price: {price}",
+    xlsOrders: "Order list",
+    xlsOrdersTitle: "ORDER LIST",
+    xlsOrdersFile: "order-list",
+    xlsNote: "Note",
+
+    howTitle: "How it works",
+    howSteps: [
+      { h: "Upload your Excel", p: "An export from Excel, Shopify, QuickBooks or another system. It needs product, stock and units sold." },
+      { h: "Check the columns", p: "The tool recognizes them and you confirm. It takes under a minute." },
+      { h: "See what to do", p: "What is running out, what to order and how much, and what is not selling." },
+    ],
+    aboutTitle: "Who is behind it",
+    aboutBody:
+      "MiKardex was built by {name}, an inventory control specialist with warehouse experience in Canada and New Zealand. In her most recent role, at a food company in Vancouver, she reached 99.99% inventory accuracy in a multi-warehouse audit worth USD 25.2 million.",
+    aboutLinkedin: "LinkedIn profile",
+    dataTitle: "Your data",
+    dataPoints: [
+      "Your file is read in your browser. It is not uploaded as a file to any server.",
+      "Your product data is sent to the AI only when you ask a question, to write the answer. Our server does not keep your inventory or your questions.",
+      "We do not sell or share your data.",
+    ],
+    privacyLink: "Privacy notice",
+    footerContact: "Contact",
+    privacyTitle: "Privacy notice",
+    privacyUpdated: "Last updated: October 2, 2026",
+    privacySections: [
+      { h: "Who is responsible", p: ["MiKardex is operated by {name}. Contact: {email}."] },
+      {
+        h: "What data is handled",
+        p: [
+          "The file you load: it is read in your browser and is not uploaded as a file to our servers. The products read from it stay saved in your own browser so you do not have to load them again. They are removed when you load another file or clear this site's data in your browser.",
+          "Your questions to the assistant: when you ask a question, the question and your product data (code, name, warehouse, stock, usage, reorder point, lead time, units on order and unit cost) are sent to our server, which passes them to Anthropic, the provider of the AI model, to write the answer. Our server does not keep your inventory or your questions.",
+          "Plan requests: if you request the plan, we receive your email and the note you write. We use them only to contact you.",
+          "Technical records: the server notes, without any content, how many questions are asked and how many products they carry, to control usage. Our hosting providers may record technical data such as the IP address.",
+        ],
+      },
+      { h: "What it is used for", p: ["To give you the analysis you ask for and, if you request it, to contact you about the plan. We do not sell your data or use it for advertising."] },
+      {
+        h: "Providers",
+        p: ["Vercel (hosts the page), Render (hosts the server), Anthropic (AI model), Resend (sends email) and Google Fonts (typefaces). Each one handles data under its own terms."],
+      },
+      { h: "A recommendation", p: ["Do not include personal data about your customers in the file. The tool does not need it."] },
+      {
+        h: "Your rights",
+        p: ["You can ask for access to, correction of or deletion of the data we hold about you (for example, your email if you requested the plan) by writing to {email}."],
+      },
+      { h: "Changes", p: ["If this notice changes, the new version will be published here."] },
+    ],
     needProduct: "Choose the column with the product code or name.",
     needStock: "Choose the column with the current stock.",
     needDemand: "Choose a column with units sold, daily usage or minimum stock.",
@@ -290,6 +381,7 @@ const STRINGS = {
     planReasonDashboard: "El dashboard es parte del plan.",
     planIncludes: "Qué incluye el plan",
     planItems: [
+      "Lista de compra completa, con cantidades, descargable en Excel",
       "Dashboard con gráficos por estado, bodega y días de cobertura",
       "Capital detenido en stock que no se vende",
       "Carga de un archivo actualizado cada vez que lo necesites",
@@ -339,6 +431,96 @@ const STRINGS = {
     field_reorder_point: "Stock mínimo / punto de reorden",
     field_lead_time_days: "Días de reposición",
     field_unit_cost: "Costo unitario",
+
+    field_on_order: "Unidades ya pedidas (en tránsito)",
+
+    tabOrders: "Qué pedir",
+    summaryRunOut: "Se agotan primero",
+    summaryRunOutHint: "Días de stock que quedan",
+    summaryRunOutNone: "Nada está cerca de agotarse.",
+    summaryToOrder: "Para pedir hoy",
+    summaryToOrderHint: "Productos que necesitan un pedido nuevo",
+    summaryToOrderCost: "Pedido estimado: {amount}",
+    summaryToOrderNone: "Nada que pedir hoy.",
+    summaryOpenOrders: "Ver la lista de compra",
+    summaryNotMoving: "No se mueven",
+    summaryNotMovingHint: "Productos sin ventas o con exceso de stock",
+    summaryTiedUp: "Capital detenido: {amount}",
+    summaryTiedUpLocked: "Desbloquea el dashboard para ver cuánto capital es.",
+    summaryOpenDashboard: "Ver el dashboard",
+    daysShort: "{n} d",
+
+    ordersTitle: "Qué pedir hoy",
+    ordersCoverBefore: "Cada pedido debe cubrir",
+    ordersCoverAfter: "días de venta",
+    ordersRule:
+      "Un producto aparece cuando su stock, más lo que ya está pedido, queda bajo su punto de reorden. Cantidad = punto de reorden + {days} días de venta − stock − unidades ya pedidas.",
+    ordersRuleMinimum: "Los productos sin datos de venta se reponen hasta el doble de su stock mínimo.",
+    ordersDisclaimer: "Son estimaciones a partir de tu archivo. Revísalas antes de comprar.",
+    ordersEmpty: "Nada que pedir hoy: ningún producto está bajo su punto de reorden.",
+    colProduct: "Producto",
+    colStock: "Stock",
+    colCover: "Días de cobertura",
+    colLead: "Días de reposición",
+    colOnOrder: "Ya pedido",
+    colQty: "Pedir",
+    colCost: "Costo del pedido",
+    ordersLate: "Se agota antes de que llegue un pedido nuevo",
+    ordersTotal: "Total",
+    ordersTotalProducts: "Productos: {n}",
+    ordersExport: "Descargar lista de compra (Excel)",
+    ordersLockedMore: "Productos más en la lista: {n}. La lista completa y la descarga en Excel son parte del plan.",
+    ordersUnlock: "Desbloquear la lista completa",
+    planReasonOrders: "La lista de compra completa y su descarga en Excel son parte del plan.",
+    planPrice: "Precio: {price}",
+    xlsOrders: "Lista de compra",
+    xlsOrdersTitle: "LISTA DE COMPRA",
+    xlsOrdersFile: "lista-de-compra",
+    xlsNote: "Nota",
+
+    howTitle: "Cómo funciona",
+    howSteps: [
+      { h: "Sube tu Excel", p: "Un archivo exportado de Excel, Bsale, Shopify u otro sistema. Necesita producto, stock y unidades vendidas." },
+      { h: "Revisa las columnas", p: "La herramienta las reconoce y tú confirmas. Toma menos de un minuto." },
+      { h: "Mira qué hacer", p: "Qué se está agotando, qué pedir y cuánto, y qué no se está vendiendo." },
+    ],
+    aboutTitle: "Quién está detrás",
+    aboutBody:
+      "MiKardex lo creó {name}, especialista en control de inventario con experiencia en bodegas de Canadá y Nueva Zelanda. En su último cargo, en una empresa de alimentos de Vancouver, logró 99,99% de exactitud de inventario en una auditoría de varias bodegas por USD 25,2 millones.",
+    aboutLinkedin: "Perfil de LinkedIn",
+    dataTitle: "Tus datos",
+    dataPoints: [
+      "Tu archivo se lee en tu navegador. No se sube como archivo a ningún servidor.",
+      "Los datos de tus productos se envían a la IA solo cuando haces una pregunta, para escribir la respuesta. Nuestro servidor no guarda tu inventario ni tus preguntas.",
+      "No vendemos ni compartimos tus datos.",
+    ],
+    privacyLink: "Aviso de privacidad",
+    footerContact: "Contacto",
+    privacyTitle: "Aviso de privacidad",
+    privacyUpdated: "Última actualización: 2 de octubre de 2026",
+    privacySections: [
+      { h: "Quién es responsable", p: ["MiKardex es operado por {name}. Contacto: {email}."] },
+      {
+        h: "Qué datos se tratan",
+        p: [
+          "El archivo que cargas: se lee en tu navegador y no se sube como archivo a nuestros servidores. Los productos leídos quedan guardados en tu propio navegador para que no tengas que cargarlos de nuevo. Se borran cuando cargas otro archivo o borras los datos de este sitio en tu navegador.",
+          "Tus preguntas al asistente: cuando haces una pregunta, se envían a nuestro servidor la pregunta y los datos de tus productos (código, nombre, bodega, stock, consumo, punto de reorden, días de reposición, unidades ya pedidas y costo unitario). El servidor los pasa a Anthropic, el proveedor del modelo de IA, para escribir la respuesta. Nuestro servidor no guarda tu inventario ni tus preguntas.",
+          "Solicitudes de plan: si pides el plan, recibimos tu correo y la nota que escribas. Los usamos solo para contactarte.",
+          "Registros técnicos: el servidor anota, sin contenido, cuántas preguntas se hacen y cuántos productos traen, para controlar el uso. Nuestros proveedores de alojamiento pueden registrar datos técnicos como la dirección IP.",
+        ],
+      },
+      { h: "Para qué se usan", p: ["Para darte el análisis que pides y, si lo solicitas, contactarte por el plan. No vendemos tus datos ni los usamos para publicidad."] },
+      {
+        h: "Proveedores",
+        p: ["Vercel (aloja la página), Render (aloja el servidor), Anthropic (modelo de IA), Resend (envío de correos) y Google Fonts (tipografías). Cada uno trata los datos según sus propias condiciones."],
+      },
+      { h: "Una recomendación", p: ["No incluyas datos personales de tus clientes en el archivo. La herramienta no los necesita."] },
+      {
+        h: "Tus derechos",
+        p: ["Puedes pedir acceso, corrección o eliminación de los datos que tengamos sobre ti (por ejemplo, tu correo si pediste el plan) escribiendo a {email}."],
+      },
+      { h: "Cambios", p: ["Si este aviso cambia, la nueva versión se publicará aquí."] },
+    ],
     needProduct: "Elige la columna con el código o el nombre del producto.",
     needStock: "Elige la columna con el stock actual.",
     needDemand: "Elige una columna con unidades vendidas, consumo diario o stock mínimo.",
@@ -388,6 +570,11 @@ export function detectLang() {
   }
 }
 
+// Replaces {name} marks in a text
+export function fill(text, vars) {
+  return text.replace(/\{(\w+)\}/g, (match, name) => (vars[name] !== undefined ? String(vars[name]) : match));
+}
+
 // t(lang)("key", { name: value })
 export function translator(lang) {
   const table = STRINGS[lang] || STRINGS.en;
@@ -396,7 +583,7 @@ export function translator(lang) {
     if (text === undefined) text = STRINGS.en[key];
     if (text === undefined) return key;
     if (typeof text !== "string" || !vars) return text;
-    return text.replace(/\{(\w+)\}/g, (match, name) => (vars[name] !== undefined ? String(vars[name]) : match));
+    return fill(text, vars);
   };
 }
 

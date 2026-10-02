@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, KeyRound } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
-import { FREE_UPLOADS, FREE_QUESTIONS, CONTACT_EMAIL } from "./config";
+import { FREE_UPLOADS, FREE_QUESTIONS, CONTACT_EMAIL, PLAN_PRICE } from "./config";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,7 +20,10 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
       ? t("planReasonQuestions", { questions: FREE_QUESTIONS })
       : reason === "dashboard"
       ? t("planReasonDashboard")
+      : reason === "orders"
+      ? t("planReasonOrders")
       : "";
+  const price = PLAN_PRICE[lang] || "";
 
   async function sendRequest(e) {
     e.preventDefault();
@@ -83,6 +86,11 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
           </li>
         ))}
       </ul>
+      {price && (
+        <p style={{ fontSize: 16, fontWeight: 600, margin: "-6px 0 20px", color: COLORS.ink }} data-testid="plan-price">
+          {t("planPrice", { price })}
+        </p>
+      )}
 
       {codeState === "active" ? (
         <div
