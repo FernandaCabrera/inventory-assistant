@@ -177,6 +177,25 @@ describe("buildInventory", () => {
     expect(s.warehouseCount).toBe(2);
   });
 
+  test("notes under the table are left out quietly; products without stock are reported", () => {
+    const { items, report } = buildInventory(
+      {
+        headers,
+        rows: [
+          ["A1", "Café", "Central", 12, 90, 4200],
+          ["New product? Add it to Products, then type its SKU in a new row", "", "", "", "", ""],
+          ["", "Priority: 1 = out of stock, 2 = reorder now", "", "", "", ""],
+          ["A2", "Té", "Central", "n/d", 30, 1800], // text where the stock should be
+          ["A3", "Sal", "Central", "", 10, ""], // sells, but stock is blank
+        ],
+      },
+      mapping,
+      settings
+    );
+    expect(items.map((i) => i.sku)).toEqual(["A1"]);
+    expect(report).toMatchObject({ read: 1, skippedEmpty: 2, skippedNoStock: 2 });
+  });
+
   test("minimum stock without sales still gives a status", () => {
     const h = ["Producto", "Stock", "Stock mínimo"];
     const { items } = buildInventory({ headers: h, rows: [["Leche", 4, 10]] }, guessMapping(h), settings);

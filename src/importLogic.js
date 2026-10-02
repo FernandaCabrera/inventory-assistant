@@ -309,7 +309,13 @@ export function buildInventory(table, mapping, settings) {
 
     let stock = parseNumber(at(row, "stock"));
     if (stock === null) {
-      report.skippedNoStock += 1;
+      // A line of text under the table (a note, a legend) has nothing in the data columns:
+      // leave it out quietly. Only a row that looks like a product is reported.
+      const looksLikeProduct =
+        !isBlank(at(row, "stock")) ||
+        ["sales", "avg_daily_usage", "reorder_point", "unit_cost", "lead_time_days"].some((f) => !isBlank(at(row, f)));
+      if (looksLikeProduct) report.skippedNoStock += 1;
+      else report.skippedEmpty += 1;
       continue;
     }
     if (stock < 0) {
