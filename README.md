@@ -15,7 +15,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
 - **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000.
-- **Free tier and paid plan** — without a plan: one file, three questions, the first three rows of the order list, and the dashboard shown locked. An access code unlocks the full order list with its Excel download, the dashboard, new uploads and more questions. Visitors can request the plan from the app; the request is emailed to the owner.
+- **Free tier and paid plan** — without a plan: three uploads, three questions, the first three rows of the order list, and the dashboard shown locked. The plan (USD 12 per month) unlocks the full order list with its Excel download, the dashboard, unlimited uploads and more questions. Visitors subscribe on a Stripe payment link and the plan switches on by itself when they come back; while no Stripe link is set they request the plan from the page and the request is emailed to the owner.
 - **Usage limits** — daily caps per visitor, per access code and in total keep the AI bill bounded.
 - **Excel export** — every answer can be exported as a formatted workbook with a narrative report sheet and a color-coded action plan table.
 - **Automated email alerts** — a scheduled job checks the sample dataset and emails a formatted alert whenever SKUs fall below their reorder point.
@@ -61,6 +61,7 @@ ANTHROPIC_API_KEY=your_key_here
 RESEND_API_KEY=your_key_here
 ACCESS_CODES=CAFE-2291,TIENDA-8840
 LEADS_RECIPIENT=you@example.com
+STRIPE_SECRET_KEY=rk_live_your_restricted_key
 ```
 
 **3. Run the backend**
@@ -81,21 +82,26 @@ The app opens at `http://localhost:3000`.
 **Tests**
 
 ```bash
-npm test
+npm test                 # the page
+cd server && npm test    # the Stripe logic on the server
 ```
 
 ## Plans, codes and limits
 
 | What | Where | Default |
 |---|---|---|
-| Free files per browser | `src/config.js` → `FREE_UPLOADS` | 1 |
+| Free uploads per browser (the same Excel loaded again counts) | `src/config.js` → `FREE_UPLOADS` | 3 |
 | Free questions per browser | `src/config.js` → `FREE_QUESTIONS` | 3 |
 | Order list rows shown without a plan | `src/config.js` → `ORDER_FREE_ROWS` | 3 |
 | Days of sales a new order should cover | `src/config.js` → `ORDER_COVER_DAYS` (visitors can change it) | 30 |
 | Count report: Excel download needs the plan | `src/config.js` → `COUNT_EXPORT_NEEDS_PLAN` | true |
 | Count report: default cycle, in days | `src/config.js` → `DEFAULT_CYCLE_DAYS` (visitors can change it) | 90 |
 | Count report: lines read from a file | `src/config.js` → `COUNT_MAX_LINES` | 50,000 |
-| Price shown in the plan window, per language | `src/config.js` → `PLAN_PRICE` | none |
+| Price shown in the plan window, per language (the amount charged is the one set in Stripe) | `src/config.js` → `PLAN_PRICE` | USD 12 per month |
+| Stripe payment link behind the "Subscribe" button | `src/config.js` → `STRIPE_PAYMENT_LINK` | none (the request form is shown) |
+| Stripe customer portal link, to change card or cancel | `src/config.js` → `STRIPE_PORTAL_LINK` | none |
+| Stripe key the server uses to check subscriptions | server env `STRIPE_SECRET_KEY` | none (Stripe off) |
+| Only this Stripe price unlocks the plan | server env `STRIPE_PRICE_ID` | any subscription on the account |
 | Name and LinkedIn shown under "Who is behind it" | `src/config.js` → `OWNER_NAME`, `OWNER_LINKEDIN` | — |
 | Access codes for the paid plan | server env `ACCESS_CODES` (comma-separated) | none |
 | Questions per day without a code, per network address | server env `FREE_DAILY_QUESTIONS_PER_IP` | 10 |
@@ -105,14 +111,35 @@ npm test
 | Where plan requests are emailed | server env `LEADS_RECIPIENT` | `ALERT_RECIPIENT` |
 | "View prompt" button (shows the AI instructions) | `src/config.js` → `SHOW_PROMPT` and server env `EXPOSE_SYSTEM_PROMPT=true` | off |
 
-To give a customer the plan: add a code to `ACCESS_CODES`, restart the server, and send them the code. They enter it under "Free plan" in the app. Removing the code switches their plan off on their next visit.
+To give a customer the plan by hand: add a code to `ACCESS_CODES`, restart the server, and send them the code. They enter it under "Free plan" in the app. Removing the code switches their plan off on their next visit.
 
 What these limits are and are not:
 
-- The free limits (one file, three questions) and the dashboard lock are kept in the visitor's browser. They are a sales gate, not a security boundary: clearing browser data resets them. The server-side daily caps are what bound cost.
+- The free limits (three uploads, three questions) and the dashboard lock are kept in the visitor's browser. They are a sales gate, not a security boundary: clearing browser data resets them. The server-side daily caps are what bound cost.
 - Daily counters are held in memory, so they reset at 00:00 UTC and whenever the server restarts.
-- A real paywall (accounts, stored inventories, online payment) is the next step once people are asking for the plan.
+- There are no accounts and nothing about customers is stored on the server: Stripe is the record of who has paid.
 - Also set a monthly spend limit in the Anthropic Console as a last line of defense.
+
+## Subscriptions with Stripe
+
+Visitors pay on a Stripe Payment Link. Stripe sends them back to the site, the page asks the server to confirm the payment, and the plan switches on. From then on the server asks Stripe whether the subscription is still active, so a cancelled or unpaid subscription switches the plan off by itself.
+
+**Set it up once**
+
+1. In Stripe, create a product with a recurring price of USD 12 per month, and a Payment Link for it.
+2. In the Payment Link, under "After payment", choose "Don't show confirmation page" and send people to `https://mikardex.cl/?session_id={CHECKOUT_SESSION_ID}` (the address where the tool opens, then `?session_id={CHECKOUT_SESSION_ID}` exactly as written).
+3. Paste the link in `src/config.js` → `STRIPE_PAYMENT_LINK` and publish the page.
+4. In Stripe, create a restricted key (Developers → API keys → Create restricted key) with only "Checkout Sessions: Read" and "Subscriptions: Read". Add it on the server host as `STRIPE_SECRET_KEY` and restart the server. The log then says `Stripe: on.`
+5. Optional: switch on Stripe's customer portal and paste its link in `STRIPE_PORTAL_LINK`, so customers can change their card or cancel on their own.
+
+Try it in Stripe's test mode first: a test Payment Link, a test key (`rk_test_...`) and the card `4242 4242 4242 4242`.
+
+**How a customer keeps their plan**
+
+- The access code is the Stripe subscription id (`sub_...`). It is saved in the browser where they paid and shown to them in "Plan active", to enter on another computer under "Already have a code?".
+- If a customer loses the code, or paid but was not brought back to the site, open the customer in the Stripe dashboard, copy the subscription id and send it to them. It works as their code.
+- The server asks Stripe about an active code again after 10 minutes, so a cancellation takes effect within that time. If Stripe cannot be reached, customers already seen as active keep the plan for up to a day.
+- The logic is in `server/stripe.js` (server), `src/plan.js` and `src/PlanModal.jsx` (page).
 
 ## Cycle count report
 

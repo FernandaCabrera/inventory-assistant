@@ -60,7 +60,7 @@ test("a stored upload on the free plan shows the dashboard locked", () => {
       ],
     })
   );
-  window.localStorage.setItem("mikardex.uploadsUsed", "1");
+  window.localStorage.setItem("mikardex.uploadsUsed", "3");
   render(<App />);
 
   expect(screen.getByText(/stock.xlsx loaded, products: 2. Critical: 1 · Low: 0 · No sales: 1 · Excess: 0/)).toBeInTheDocument();
@@ -68,9 +68,31 @@ test("a stored upload on the free plan shows the dashboard locked", () => {
   expect(screen.getByText("The dashboard is part of the paid plan")).toBeInTheDocument();
   expect(screen.getByText(/Capital is tied up in 1 of your products/)).toBeInTheDocument();
 
-  // a second upload on the free plan opens the plan window instead of the file picker
+  // once the three free uploads are used, another one opens the plan window instead of the file picker
   fireEvent.click(screen.getByText("Replace data"));
-  expect(screen.getByText(/The free plan includes 1 file/)).toBeInTheDocument();
+  expect(screen.getByText(/The free plan includes 3 uploads of your Excel/)).toBeInTheDocument();
+  expect(screen.getByTestId("plan-price")).toHaveTextContent("Price: USD 12 per month");
+  // no Stripe link set: the plan is requested by email, there is no pay button
+  expect(screen.getByText("Request the plan")).toBeInTheDocument();
+  expect(screen.queryByTestId("plan-pay")).not.toBeInTheDocument();
+});
+
+test("the free plan allows three uploads: the second and third open the file picker", () => {
+  const items = [{ sku: "A1", name: "Cafe", warehouse: "Main", stock: 2, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3 }];
+  window.localStorage.setItem("mikardex.dataset", JSON.stringify({ source: "upload", fileName: "stock.xlsx", loadedAt: "2026-10-01T12:00:00.000Z", items }));
+  window.localStorage.setItem("mikardex.uploadsUsed", "2");
+  render(<App />);
+
+  fireEvent.click(screen.getByText("Replace data"));
+  expect(screen.getByRole("dialog", { name: "Upload your inventory" })).toBeInTheDocument();
+  expect(screen.queryByText(/The free plan includes/)).not.toBeInTheDocument();
+});
+
+test("the home page states the free plan in both languages", () => {
+  render(<App />);
+  expect(screen.getByText("Free: 3 uploads of your Excel and 3 questions. No sign-up.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  expect(screen.getByText("Gratis: 3 subidas de tu Excel y 3 preguntas. Sin registro.")).toBeInTheDocument();
 });
 
 test("the AI prompt is not shown to visitors", () => {
