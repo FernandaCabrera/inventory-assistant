@@ -35,12 +35,14 @@ import {
   Legend,
 } from "recharts";
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
-import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney } from "./i18n";
+import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, tiedUpValue, summarize, toNumber } from "./inventoryLogic";
 import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
 import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
 import UpgradeModal from "./UpgradeModal";
+import PlanModal from "./PlanModal";
+import { cleanCode, returnedSessionId, clearReturnedSession } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HomeSections, Footer, PrivacyModal } from "./HomeSections";
@@ -623,7 +625,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current
       </div>
 
       <p style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLORS.ink, letterSpacing: "0.03em", margin: "20px 0 6px" }}>
-        {t("freeNote", { uploads: FREE_UPLOADS, questions: FREE_QUESTIONS })}
+        {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })}
       </p>
       <p style={{ fontSize: 12.5, color: COLORS.inkMuted, maxWidth: 440, lineHeight: 1.55, margin: 0 }}>{t("privacy")}</p>
       {current && current.isUpload && (
@@ -701,6 +703,10 @@ export default function InventoryAssistant() {
   const [exportingIndex, setExportingIndex] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState(null); // null = closed
+  // Back from paying on Stripe: the address carries the session to confirm with the server.
+  const paymentSession = useRef(returnedSessionId());
+  // The customer's own plan window: null = closed, or "checking" | "active" | "failed" | "error"
+  const [planWindow, setPlanWindow] = useState(() => (paymentSession.current ? "checking" : null));
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [coverDays, setCoverDays] = useState(() => String(load("coverDays", ORDER_COVER_DAYS)));
   // Cycle count report. Kept only while the page is open: it is never saved or sent anywhere.
@@ -744,10 +750,11 @@ export default function InventoryAssistant() {
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled && data && data.valid === false) {
-          setAccessCode("");
-          remove("accessCode");
-        }
+        if (cancelled || !data || data.valid !== false) return;
+        // Only the code that was checked is dropped: a new one may have arrived meanwhile
+        // (someone who subscribes again comes back from Stripe with a new code).
+        if (load("accessCode", "") === accessCode) remove("accessCode");
+        setAccessCode((current) => (current === accessCode ? "" : current));
       })
       .catch(() => {
         // offline or server asleep: keep the code and try again next visit
@@ -897,6 +904,7 @@ export default function InventoryAssistant() {
   const openCountImport = useCallback(() => setShowCountImport(true), []);
   const closeCountImport = useCallback(() => setShowCountImport(false), []);
   const closeUpgrade = useCallback(() => setUpgradeReason(null), []);
+  const closePlanWindow = useCallback(() => setPlanWindow(null), []);
   const openPrivacy = useCallback(() => setShowPrivacy(true), []);
   const closePrivacy = useCallback(() => setShowPrivacy(false), []);
 
@@ -907,10 +915,45 @@ export default function InventoryAssistant() {
   }
 
   function handleActivated(code) {
-    const clean = code.trim().toUpperCase();
+    const clean = cleanCode(code);
     setAccessCode(clean);
     save("accessCode", clean);
   }
+
+  // Asks the server whether the Stripe payment went through; if it did, the answer is the
+  // customer's access code. The server may be asleep, so this can take a while and can be retried.
+  async function confirmPayment() {
+    const sessionId = paymentSession.current;
+    if (!sessionId) return;
+    setPlanWindow("checking");
+    try {
+      const res = await fetch(`${API_URL}/api/stripe/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.valid && typeof data.code === "string" && data.code !== "") {
+        handleActivated(data.code);
+        setUpgradeReason(null);
+        setPlanWindow("active");
+      } else if (res.ok) {
+        setPlanWindow("failed"); // Stripe says this payment did not go through
+      } else {
+        setPlanWindow("error"); // server or Stripe unavailable: the session stays, to try again
+        return;
+      }
+      paymentSession.current = "";
+      clearReturnedSession();
+    } catch (err) {
+      setPlanWindow("error");
+    }
+  }
+
+  useEffect(() => {
+    confirmPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function toggleShowPrompt() {
     if (!showPrompt && !systemPrompt) {
@@ -1119,6 +1162,7 @@ export default function InventoryAssistant() {
           onActivated={handleActivated}
         />
       )}
+      {planWindow !== null && <PlanModal t={t} status={planWindow} code={accessCode} onRetry={confirmPayment} onClose={closePlanWindow} />}
       {showPrivacy && <PrivacyModal t={t} onClose={closePrivacy} />}
     </>
   );
@@ -1329,9 +1373,12 @@ export default function InventoryAssistant() {
             <Lock size={11} /> {t("readOnly")}
           </span>
           {paid ? (
-            <span style={{ ...chipStyle, color: COLORS.ok, borderColor: COLORS.ok, background: COLORS.okBg, fontWeight: 600 }}>
+            <button
+              onClick={() => setPlanWindow("active")}
+              style={{ ...chipButtonStyle, color: COLORS.ok, border: `1px solid ${COLORS.ok}`, background: COLORS.okBg }}
+            >
               <BadgeCheck size={11} /> {t("planActive")}
-            </span>
+            </button>
           ) : (
             <button onClick={() => setUpgradeReason("")} style={chipButtonStyle}>
               {t("planFree")}

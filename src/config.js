@@ -1,7 +1,8 @@
 // Product settings in one place. Change a number here and rebuild.
 
 // Free plan
-export const FREE_UPLOADS = 1; // files a visitor can analyze without a plan
+// Every time a file is loaded counts as one upload, also when it is the same Excel with new numbers.
+export const FREE_UPLOADS = 3; // uploads a visitor can analyze without a plan
 export const FREE_QUESTIONS = 3; // questions to the assistant without a plan
 
 // Show the "View prompt" button that lets visitors read the AI's instructions.
@@ -37,9 +38,20 @@ export const DEFAULT_CYCLE_DAYS = 90; // every location should be counted at lea
 // The report on screen is free. true = downloading it as Excel needs the plan.
 export const COUNT_EXPORT_NEEDS_PLAN = true;
 
-// Price shown in the plan window, per language, e.g. { es: "$19.990 al mes", en: "CAD $29 per month" }.
-// Leave empty to show no price.
-export const PLAN_PRICE = { es: "", en: "" };
+// Price shown in the plan window, per language. Leave empty to show no price.
+// This is only the text on the page: the amount that is charged is the one set in Stripe.
+export const PLAN_PRICE = { es: "USD 12 al mes", en: "USD 12 per month" };
+
+// Stripe. Paste the Payment Link of the monthly plan (it looks like https://buy.stripe.com/...).
+// While it is empty the plan window shows the "request the plan" form instead of a pay button.
+// In Stripe, set the link to send people back to the site after paying, to this address:
+//   https://mikardex.cl/?session_id={CHECKOUT_SESSION_ID}
+// The server also needs STRIPE_SECRET_KEY (see server/.env.example).
+export const STRIPE_PAYMENT_LINK = "";
+
+// Optional: the link of Stripe's customer portal (https://billing.stripe.com/p/login/...), where a
+// customer changes their card or cancels. Shown to customers with an active plan.
+export const STRIPE_PORTAL_LINK = "";
 
 // Who is behind the tool (shown on the home page)
 export const OWNER_NAME = "Fernanda Cabrera";

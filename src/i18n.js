@@ -13,7 +13,9 @@ const STRINGS = {
       "An AI operations analyst for your inventory. Upload your Excel and see what to reorder, what is about to run out and what is not selling, in two minutes.",
     uploadCta: "Upload your Excel",
     sampleCta: "Try with sample data",
-    freeNote: "Free: {uploads} file and {questions} questions. No sign-up.",
+    freeNote: "Free: {uploads} and {questions} questions. No sign-up.",
+    uploads_one: "{n} upload of your Excel",
+    uploads_many: "{n} uploads of your Excel",
     privacy:
       "Your file is read in your browser. Your inventory data is sent to the AI only when you ask a question.",
 
@@ -103,7 +105,7 @@ const STRINGS = {
       "Critical: {critical} · Low: {low} · Not moving: {notMoving}. Unlock the dashboard to see them charted and ranked.",
     unlock: "Unlock",
     planTitle: "MiKardex plan",
-    planReasonUpload: "The free plan includes {uploads} file. To load an updated file you need the plan.",
+    planReasonUpload: "The free plan includes {uploads}. To keep loading updated files you need the plan.",
     planReasonQuestions: "The free plan includes {questions} questions. To keep asking you need the plan.",
     planReasonDashboard: "The dashboard is part of the plan.",
     planIncludes: "What the plan includes",
@@ -129,6 +131,18 @@ const STRINGS = {
     planCodeInvalid: "That code is not valid.",
     planCodeError: "We could not check the code. Try again in a moment.",
     planActivated: "Plan active. The dashboard and new uploads are unlocked.",
+    paySubscribe: "Subscribe",
+    payNote: "Secure payment with Stripe. Cancel whenever you want.",
+    payQuestions: "Questions before subscribing? Write to {contact}.",
+    payChecking: "Confirming your payment and activating your plan. This can take up to a minute.",
+    payFailed: "We could not confirm this payment. If you were charged, write to {contact} and we will activate your plan.",
+    payError: "We could not reach the server to activate your plan. Your payment is not lost: try again in a moment.",
+    payRetry: "Try again",
+    planYours: "Your plan",
+    planCodeLabel: "Your access code",
+    planCodeHint:
+      "Keep it somewhere safe. To use your plan in another browser or computer, open the plan there and enter it under “Already have a code?”.",
+    planManage: "Change card or cancel the subscription",
     close: "Close",
 
     importTitle: "Upload your inventory",
@@ -225,7 +239,7 @@ const STRINGS = {
     privacyLink: "Privacy notice",
     footerContact: "Contact",
     privacyTitle: "Privacy notice",
-    privacyUpdated: "Last updated: October 2, 2026",
+    privacyUpdated: "Last updated: October 5, 2026",
     privacySections: [
       { h: "Who is responsible", p: ["MiKardex is operated by {name}. Contact: {email}."] },
       {
@@ -235,13 +249,14 @@ const STRINGS = {
           "Your questions to the assistant: when you ask a question, the question and your product data (code, name, warehouse, stock, usage, reorder point, lead time, units on order and unit cost) are sent to our server, which passes them to Anthropic, the provider of the AI model, to write the answer. Our server does not keep your inventory or your questions.",
           "Cycle count reports: they are read and analyzed entirely in your browser. Nothing in them, including the names of the people who counted, is sent to our server or to the AI, and they are not saved: they are gone when you close or reload the page.",
           "Plan requests: if you request the plan, we receive your email and the note you write. We use them only to contact you.",
+          "Payments: if you subscribe, you pay on Stripe's page. Stripe receives your email and your card details; we never see or store your full card number. Through Stripe we can see your email, your name and the status of your subscription, to manage it and to contact you about it. The identifier of your subscription is saved in your browser as your access code and is sent to our server to check that the subscription is still active.",
           "Technical records: the server notes, without any content, how many questions are asked and how many products they carry, to control usage. Our hosting providers may record technical data such as the IP address.",
         ],
       },
-      { h: "What it is used for", p: ["To give you the analysis you ask for and, if you request it, to contact you about the plan. We do not sell your data or use it for advertising."] },
+      { h: "What it is used for", p: ["To give you the analysis you ask for, to manage your subscription if you have one and, if you request it, to contact you about the plan. We do not sell your data or use it for advertising."] },
       {
         h: "Providers",
-        p: ["Vercel (hosts the page), Render (hosts the server), Anthropic (AI model), Resend (sends email) and Google Fonts (typefaces). Each one handles data under its own terms."],
+        p: ["Vercel (hosts the page), Render (hosts the server), Anthropic (AI model), Stripe (payments), Resend (sends email) and Google Fonts (typefaces). Each one handles data under its own terms."],
       },
       { h: "A recommendation", p: ["Do not include personal data about your customers in the file. The tool does not need it."] },
       {
@@ -559,7 +574,9 @@ const STRINGS = {
       "Un analista de operaciones con IA para tu inventario. Sube tu Excel y mira qué reponer, qué está por agotarse y qué no se está vendiendo, en dos minutos.",
     uploadCta: "Sube tu Excel",
     sampleCta: "Probar con datos de ejemplo",
-    freeNote: "Gratis: {uploads} archivo y {questions} preguntas. Sin registro.",
+    freeNote: "Gratis: {uploads} y {questions} preguntas. Sin registro.",
+    uploads_one: "{n} subida de tu Excel",
+    uploads_many: "{n} subidas de tu Excel",
     privacy:
       "Tu archivo se lee en tu navegador. Los datos de tu inventario se envían a la IA solo cuando haces una pregunta.",
 
@@ -650,7 +667,7 @@ const STRINGS = {
       "Críticos: {critical} · Bajos: {low} · Sin movimiento: {notMoving}. Desbloquea el dashboard para verlos graficados y ordenados.",
     unlock: "Desbloquear",
     planTitle: "Plan MiKardex",
-    planReasonUpload: "El plan gratis incluye {uploads} archivo. Para cargar un archivo actualizado necesitas el plan.",
+    planReasonUpload: "El plan gratis incluye {uploads}. Para seguir cargando archivos actualizados necesitas el plan.",
     planReasonQuestions: "El plan gratis incluye {questions} preguntas. Para seguir preguntando necesitas el plan.",
     planReasonDashboard: "El dashboard es parte del plan.",
     planIncludes: "Qué incluye el plan",
@@ -676,6 +693,18 @@ const STRINGS = {
     planCodeInvalid: "Ese código no es válido.",
     planCodeError: "No pudimos revisar el código. Intenta de nuevo en un momento.",
     planActivated: "Plan activo. El dashboard y las nuevas cargas quedaron desbloqueados.",
+    paySubscribe: "Suscribirme",
+    payNote: "Pago seguro con Stripe. Cancelas cuando quieras.",
+    payQuestions: "¿Dudas antes de suscribirte? Escríbenos a {contact}.",
+    payChecking: "Estamos confirmando tu pago y activando tu plan. Puede tardar hasta un minuto.",
+    payFailed: "No pudimos confirmar este pago. Si se hizo el cobro, escríbenos a {contact} y activamos tu plan.",
+    payError: "No pudimos conectar con el servidor para activar tu plan. Tu pago no se pierde: intenta de nuevo en un momento.",
+    payRetry: "Reintentar",
+    planYours: "Tu plan",
+    planCodeLabel: "Tu código de acceso",
+    planCodeHint:
+      "Guárdalo. Para usar tu plan en otro navegador o computador, abre el plan ahí e ingrésalo en “¿Ya tienes un código?”.",
+    planManage: "Cambiar tarjeta o cancelar la suscripción",
     close: "Cerrar",
 
     importTitle: "Sube tu inventario",
@@ -772,7 +801,7 @@ const STRINGS = {
     privacyLink: "Aviso de privacidad",
     footerContact: "Contacto",
     privacyTitle: "Aviso de privacidad",
-    privacyUpdated: "Última actualización: 2 de octubre de 2026",
+    privacyUpdated: "Última actualización: 5 de octubre de 2026",
     privacySections: [
       { h: "Quién es responsable", p: ["MiKardex es operado por {name}. Contacto: {email}."] },
       {
@@ -782,13 +811,14 @@ const STRINGS = {
           "Tus preguntas al asistente: cuando haces una pregunta, se envían a nuestro servidor la pregunta y los datos de tus productos (código, nombre, bodega, stock, consumo, punto de reorden, días de reposición, unidades ya pedidas y costo unitario). El servidor los pasa a Anthropic, el proveedor del modelo de IA, para escribir la respuesta. Nuestro servidor no guarda tu inventario ni tus preguntas.",
           "Reportes de conteos cíclicos: se leen y se analizan por completo en tu navegador. Nada de su contenido, incluidos los nombres de quienes contaron, se envía a nuestro servidor ni a la IA, y no quedan guardados: desaparecen cuando cierras o recargas la página.",
           "Solicitudes de plan: si pides el plan, recibimos tu correo y la nota que escribas. Los usamos solo para contactarte.",
+          "Pagos: si te suscribes, pagas en la página de Stripe. Stripe recibe tu correo y los datos de tu tarjeta; nosotros nunca vemos ni guardamos el número completo de tu tarjeta. A través de Stripe podemos ver tu correo, tu nombre y el estado de tu suscripción, para administrarla y contactarte por ella. El identificador de tu suscripción queda guardado en tu navegador como tu código de acceso y se envía a nuestro servidor para comprobar que la suscripción sigue activa.",
           "Registros técnicos: el servidor anota, sin contenido, cuántas preguntas se hacen y cuántos productos traen, para controlar el uso. Nuestros proveedores de alojamiento pueden registrar datos técnicos como la dirección IP.",
         ],
       },
-      { h: "Para qué se usan", p: ["Para darte el análisis que pides y, si lo solicitas, contactarte por el plan. No vendemos tus datos ni los usamos para publicidad."] },
+      { h: "Para qué se usan", p: ["Para darte el análisis que pides, administrar tu suscripción si tienes una y, si lo solicitas, contactarte por el plan. No vendemos tus datos ni los usamos para publicidad."] },
       {
         h: "Proveedores",
-        p: ["Vercel (aloja la página), Render (aloja el servidor), Anthropic (modelo de IA), Resend (envío de correos) y Google Fonts (tipografías). Cada uno trata los datos según sus propias condiciones."],
+        p: ["Vercel (aloja la página), Render (aloja el servidor), Anthropic (modelo de IA), Stripe (pagos), Resend (envío de correos) y Google Fonts (tipografías). Cada uno trata los datos según sus propias condiciones."],
       },
       { h: "Una recomendación", p: ["No incluyas datos personales de tus clientes en el archivo. La herramienta no los necesita."] },
       {
@@ -1113,6 +1143,11 @@ export function detectLang() {
 // Replaces {name} marks in a text
 export function fill(text, vars) {
   return text.replace(/\{(\w+)\}/g, (match, name) => (vars[name] !== undefined ? String(vars[name]) : match));
+}
+
+// "1 upload" or "3 uploads": picks key_one or key_many by the number
+export function countText(t, key, n) {
+  return t(n === 1 ? `${key}_one` : `${key}_many`, { n });
 }
 
 // t(lang)("key", { name: value })

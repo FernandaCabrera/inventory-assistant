@@ -6,6 +6,7 @@ const { Resend } = require("resend");
 const cron = require("node-cron");
 const fs = require("fs");
 const path = require("path");
+const { createStripePlan, isSubscriptionId } = require("./stripe");
 
 const app = express();
 
@@ -38,13 +39,26 @@ const ALERT_SENDER = process.env.ALERT_SENDER || "Inventory Assistant <onboardin
 const LEADS_RECIPIENT = process.env.LEADS_RECIPIENT || ALERT_RECIPIENT;
 
 // ---- PLANS AND LIMITS ----
-// The paid plan is unlocked with an access code. Codes live in the ACCESS_CODES environment
-// variable, comma-separated (ACCESS_CODES=CAFE-2291,TIENDA-8840). Remove a code to switch it off.
+// The paid plan is unlocked with an access code. There are two kinds:
+//   - Codes you hand out yourself. They live in the ACCESS_CODES environment variable,
+//     comma-separated (ACCESS_CODES=CAFE-2291,TIENDA-8840). Remove a code to switch it off.
+//   - A Stripe subscription. Whoever pays on the Stripe link gets their subscription id (sub_...)
+//     as their code, and it works for as long as the subscription is active. See stripe.js.
 function normalizeCode(value) {
-  return String(value || "").trim().toUpperCase();
+  const code = String(value || "").trim();
+  // Stripe ids are case-sensitive; the codes handed out by hand are not
+  return isSubscriptionId(code) ? code : code.toUpperCase();
 }
 
 const ACCESS_CODES = new Set((process.env.ACCESS_CODES || "").split(",").map(normalizeCode).filter(Boolean));
+
+// Off until STRIPE_SECRET_KEY is set. STRIPE_PRICE_ID is optional: set it if the same Stripe
+// account sells other subscriptions, so only this one unlocks the plan.
+const stripePlan = createStripePlan({
+  secretKey: process.env.STRIPE_SECRET_KEY,
+  priceId: process.env.STRIPE_PRICE_ID,
+  apiBase: process.env.STRIPE_API_BASE || undefined, // only for tests
+});
 
 function intEnv(name, fallback) {
   const n = parseInt(process.env[name], 10);
@@ -86,6 +100,16 @@ function take(key, max) {
   if (current >= max) return false;
   counters.counts.set(key, current + 1);
   return true;
+}
+
+// Is this code a paid plan? "active" | "inactive" | "unknown" (a Stripe code that could not be
+// checked right now). An address that has sent too many wrong codes today gets no more questions
+// to Stripe, only what is already known, so made-up codes cannot be used to flood Stripe.
+async function planStatus(code, ip) {
+  if (code === "") return "inactive";
+  if (ACCESS_CODES.has(code)) return "active";
+  const tooManyWrongCodes = used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp;
+  return stripePlan.check(code, { cacheOnly: tooManyWrongCodes });
 }
 
 const SYSTEM_PROMPT = `You are a senior inventory planning analyst advising the owner or operations manager of a small or
@@ -271,7 +295,10 @@ app.post("/api/ask", async (req, res) => {
 
   const ip = req.ip || "unknown";
   const code = normalizeCode(body.code);
-  const hasPlan = code !== "" && ACCESS_CODES.has(code);
+  const plan = await planStatus(code, ip);
+  const hasPlan = plan === "active";
+  // a Stripe code that is not a live subscription counts as a wrong code for this address
+  if (plan === "inactive" && isSubscriptionId(code)) take(`codefail:${ip}`, LIMITS.codeFailuresPerIp);
 
   if (used("global") >= LIMITS.global) {
     console.warn(`[LIMIT] global daily limit reached (${LIMITS.global})`);
@@ -352,15 +379,43 @@ app.get("/api/system-prompt", (req, res) => {
 
 // ---- ACCESS CODES ----
 
-app.post("/api/validate-code", (req, res) => {
+app.post("/api/validate-code", async (req, res) => {
   const ip = req.ip || "unknown";
   if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) {
     return res.status(429).json({ valid: false, error: "limit" });
   }
   const code = normalizeCode(req.body && req.body.code);
-  const valid = code !== "" && ACCESS_CODES.has(code);
+  const status = await planStatus(code, ip);
+  // Stripe could not be reached: say so instead of "not valid", so the page keeps the
+  // customer's code and tries again on their next visit.
+  if (status === "unknown") return res.status(503).json({ error: "unavailable" });
+  const valid = status === "active";
   if (!valid) take(`codefail:${ip}`, LIMITS.codeFailuresPerIp);
   res.json({ valid });
+});
+
+// ---- STRIPE ----
+// The visitor is back from paying on Stripe: the page sends the session id from the address and
+// gets the access code for that subscription.
+app.post("/api/stripe/activate", async (req, res) => {
+  const ip = req.ip || "unknown";
+  if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) {
+    return res.status(429).json({ valid: false, error: "limit" });
+  }
+  const sessionId = typeof (req.body && req.body.sessionId) === "string" ? req.body.sessionId.trim() : "";
+  const result = await stripePlan.activate(sessionId);
+
+  if (result.ok) {
+    // the code opens the plan, so only its last characters go in the log (enough to find it in Stripe)
+    console.log(`[PLAN] Stripe subscription activated: sub_...${result.code.slice(-6)}`);
+    return res.json({ valid: true, code: result.code });
+  }
+  if (result.error === "unavailable" || result.error === "disabled") {
+    if (result.error === "disabled") console.error("[STRIPE] A payment came back but STRIPE_SECRET_KEY is not set.");
+    return res.status(503).json({ error: "unavailable" });
+  }
+  take(`codefail:${ip}`, LIMITS.codeFailuresPerIp);
+  res.json({ valid: false, error: result.error });
 });
 
 // ---- PLAN REQUESTS ----
@@ -549,6 +604,11 @@ app.use((err, req, res, next) => {
 console.log(
   `Plans: ${ACCESS_CODES.size} access code(s) loaded. Daily limits: ${LIMITS.freePerIp} free per address, ` +
     `${LIMITS.plan} per code, ${LIMITS.global} in total.`
+);
+console.log(
+  stripePlan.enabled
+    ? `Stripe: on${process.env.STRIPE_PRICE_ID ? `, only for price ${process.env.STRIPE_PRICE_ID}` : ""}.`
+    : "Stripe: off (set STRIPE_SECRET_KEY to accept subscriptions)."
 );
 
 const PORT = 4001;

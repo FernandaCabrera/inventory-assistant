@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Check, KeyRound } from "lucide-react";
+import { ArrowRight, Check, KeyRound } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
 import { FREE_UPLOADS, FREE_QUESTIONS, CONTACT_EMAIL, PLAN_PRICE } from "./config";
+import { countText } from "./i18n";
+import { paymentLink } from "./plan";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,7 +17,7 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
 
   const reasonText =
     reason === "upload"
-      ? t("planReasonUpload", { uploads: FREE_UPLOADS })
+      ? t("planReasonUpload", { uploads: countText(t, "uploads", FREE_UPLOADS) })
       : reason === "questions"
       ? t("planReasonQuestions", { questions: FREE_QUESTIONS })
       : reason === "dashboard"
@@ -26,6 +28,8 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
       ? t("planReasonCounts")
       : "";
   const price = PLAN_PRICE[lang] || "";
+  // With a Stripe link set, people pay straight away; without one, they ask for the plan by email.
+  const payUrl = paymentLink(lang);
 
   async function sendRequest(e) {
     e.preventDefault();
@@ -112,6 +116,17 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
         </div>
       ) : (
         <>
+          {payUrl ? (
+            <>
+              <a href={payUrl} data-testid="plan-pay" style={{ ...primaryButton, textDecoration: "none" }}>
+                {t("paySubscribe")} <ArrowRight size={15} />
+              </a>
+              <p style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.55, margin: "10px 0 0" }}>
+                {t("payNote")} {t("payQuestions", { contact: CONTACT_EMAIL })}
+              </p>
+            </>
+          ) : (
+            <>
           <div style={sectionTitle}>{t("planRequestTitle")}</div>
           {requestState === "sent" ? (
             <div
@@ -170,6 +185,8 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
               )}
             </form>
           )}
+            </>
+          )}
 
           <div style={{ borderTop: `1px solid ${COLORS.line}`, margin: "20px 0 16px" }} />
 
@@ -185,7 +202,7 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
               placeholder={t("planCodePlaceholder")}
               aria-label={t("planCodePlaceholder")}
               autoComplete="off"
-              style={{ ...textInput, flex: "1 1 180px", width: "auto", textTransform: "uppercase" }}
+              style={{ ...textInput, flex: "1 1 180px", width: "auto", textTransform: code.trim().startsWith("sub_") ? "none" : "uppercase" }}
             />
             <button
               type="submit"
