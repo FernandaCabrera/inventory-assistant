@@ -1,7 +1,7 @@
 // Small wrapper around localStorage. Every call is guarded: in private windows or with
 // blocked site data the browser can throw, and the app must keep working without it.
 
-const PREFIX = "mikardex.";
+export const PREFIX = "mikardex.";
 
 export function load(key, fallback) {
   try {

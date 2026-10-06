@@ -1,7 +1,7 @@
 import InventoryAssistant from "./InventoryAssistant";
 
-function App() {
-  return <InventoryAssistant />;
+function App({ path }) {
+  return <InventoryAssistant path={path} />;
 }
 
 export default App;

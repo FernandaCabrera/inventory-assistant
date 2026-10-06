@@ -116,7 +116,7 @@ test("in Spanish the sample data is in Spanish, and it follows the language swit
   expect(screen.getAllByText("Pechuga de pollo congelada (caja 5 kg)").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/Planta Quilicura/).length).toBeGreaterThan(0);
 
-  fireEvent.click(screen.getByRole("button", { name: "EN" }));
+  fireEvent.click(screen.getByRole("link", { name: "EN" }));
   expect(screen.getAllByText("Frozen chicken breast (5kg case)").length).toBeGreaterThan(0);
   expect(screen.queryByText("Pechuga de pollo congelada (caja 5 kg)")).not.toBeInTheDocument();
 });

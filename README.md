@@ -11,7 +11,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **Order list** — what to order today and how much, per product, counting units already on order: quantity = reorder point + the days of sales to cover − stock − units on order. Plain arithmetic in the browser, no AI call. Flags products that will run out before a new order arrives, and downloads as an Excel file to send to suppliers.
 - **Cycle count report** — upload the count report downloaded from SAP or a warehouse system and get the conclusions written out, with charts and an Excel report. Two kinds of file work: a list of locations with the date of their last count (coverage, locations outside the cycle, locations never counted, the weekly pace needed), and a line-by-line count or adjustment report (accuracy by line and by location, value of the differences, reasons, areas, repeat locations, possible lot mix-ups, posting delay). It is computed entirely in the browser: the file is never sent to the server or to the AI, and it is not saved.
 - **Summary on load** — right after a file loads, three cards say what runs out first, how many products need an order, and how much stock is not moving. No question needed.
-- **English and Spanish** — the interface follows the browser language and can be switched at any time; answers, reports and Excel exports come out in the same language.
+- **English and Spanish** — each language has its own address (`mikardex.cl/` in Spanish, `mikardex.cl/en/` in English) and can be switched at any time; answers, reports and Excel exports come out in the same language. See [Search engines](#search-engines).
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
 - **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000. It downloads as a PowerPoint file: one slide per chart, each with what it shows and what to do, with charts and text that can be edited.
@@ -186,6 +186,19 @@ Four files, all built in the browser from the loaded inventory. Nothing is sent 
 ## Home page and privacy notice
 
 The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, accounts, analytics).
+
+## Search engines
+
+What Google needs to find the page, read it and show it in the right language.
+
+- **One address per language** — `https://www.mikardex.cl/` is Spanish and `https://www.mikardex.cl/en/` is English (`LANG_PATHS` in `src/i18n.js`). The address decides the language, not the visitor's browser: Google browses in English, so a page that follows the browser is only ever read in English. A language the visitor picked with the ES / EN switch is remembered and comes first. A new visitor whose browser is in the other language gets a small link to it next to the switch.
+- **Title and description** — `seoTitle` and `seoDescription` in `src/i18n.js`, one per language. They are the blue title and the two lines of a Google result, and the text of the preview when the link is shared.
+- **The text is in the HTML** — the page is drawn by JavaScript, so on its own the HTML has no text. After `react-scripts build`, `scripts/prerender.js` draws the home page with the page's own components and texts and writes it into `build/index.html` (Spanish) and `build/en/index.html` (English), each with its title, description, canonical address, links to the other language (`hreflang`), preview data and structured data. Nothing is written twice: change a text in `src/i18n.js` and the next build carries it. React draws the live page over it when it loads.
+- **It runs with the build** — `npm run build` does both steps. If the script finds something unexpected it stops with an error, the build fails and the published site stays as it was. Vercel has to build with `npm run build` (its default).
+- **Official address** — `SITE_URL` in `src/config.js` (`https://www.mikardex.cl`, with `www`). `mikardex.cl` without `www` redirects to it, so it is the one named in the canonical link, `public/sitemap.xml` and `public/robots.txt`.
+- **New pages** — add a `<url>` block to `public/sitemap.xml` for each one.
+- **After publishing a change to the texts** — in Google Search Console, inspect `https://www.mikardex.cl/` and press "Request indexing" so Google reads it again soon.
+- **Tests** — `src/seoPage.test.js` (addresses, tags, sitemap) and the last tests of `src/App.test.js` (language and address).
 
 ## Sample dataset
 
