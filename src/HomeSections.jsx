@@ -28,7 +28,8 @@ const wrap = { width: "100%", maxWidth: 960, margin: "0 auto", textAlign: "left"
 // The home page, under the upload buttons, in this order: how it works, the cycle count tool
 // (placed by the page itself), free trial and plan, who made it and what happens to the data.
 
-export function HowItWorks({ t }) {
+// more: the address of the page that explains the analysis in full, when it exists in this language
+export function HowItWorks({ t, more }) {
   return (
     <section style={{ ...wrap, padding: "8px 0 0", marginBottom: 36 }}>
       <h2 style={sectionTitle}>{t("howTitle")}</h2>
@@ -43,6 +44,11 @@ export function HowItWorks({ t }) {
           </div>
         ))}
       </div>
+      {more && (
+        <a href={more} style={{ ...link, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, marginTop: 14 }}>
+          {t("howMore")} <ArrowRight size={14} />
+        </a>
+      )}
     </section>
   );
 }
@@ -126,7 +132,8 @@ export function AboutAndData({ t, onPrivacy }) {
   );
 }
 
-export function Footer({ t, onPrivacy }) {
+// links: the other pages of the site, as { href, label }
+export function Footer({ t, onPrivacy, links = [] }) {
   return (
     <footer
       style={{
@@ -146,6 +153,15 @@ export function Footer({ t, onPrivacy }) {
         boxSizing: "border-box",
       }}
     >
+      {links.length > 0 && (
+        <nav data-testid="page-links" style={{ flexBasis: "100%", display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 6 }}>
+          {links.map((entry) => (
+            <a key={entry.href} href={entry.href} style={{ color: COLORS.ink, textUnderlineOffset: 3 }}>
+              {entry.label}
+            </a>
+          ))}
+        </nav>
+      )}
       <span>MiKardex · {new Date().getFullYear()}</span>
       <span style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
         <button

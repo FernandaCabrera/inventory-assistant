@@ -458,7 +458,113 @@ test("a visitor who chose English before gets English at mikardex.cl/, and the a
 
 test("Ctrl+click on a language opens it as a normal link instead of switching in place", () => {
   render(<App />);
+  // The page must leave the click alone so the browser opens the link. The test browser cannot
+  // open links, so the click is stopped here, after the page has had its turn.
+  let leftAlone = null;
+  const afterPage = (event) => {
+    leftAlone = !event.defaultPrevented;
+    event.preventDefault();
+  };
+  document.addEventListener("click", afterPage);
   fireEvent.click(screen.getByRole("link", { name: "ES" }), { ctrlKey: true });
+  document.removeEventListener("click", afterPage);
+
+  expect(leftAlone).toBe(true);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
   expect(window.location.pathname).toBe("/en/");
+});
+
+// The pages written for one Google search each (src/pages.js, src/landingText.js)
+
+test("the cycle count page explains the report and opens the example from there", async () => {
+  window.history.replaceState(null, "", "/conteo-ciclico-sap/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Informe de conteo cíclico a partir del Excel de SAP");
+  expect(document.documentElement.lang).toBe("es");
+  expect(document.title).toBe("Informe de conteo cíclico desde el Excel de SAP · MiKardex");
+  expect(window.location.pathname).toBe("/conteo-ciclico-sap/");
+  expect(screen.getByRole("heading", { level: 2, name: "Qué archivo sirve" })).toBeInTheDocument();
+  expect(screen.getByText(/Lee hasta 50\.000 líneas por archivo/)).toBeInTheDocument();
+  expect(screen.getByText(/es parte del plan MiKardex \(USD 12 al mes\)/)).toBeInTheDocument();
+  expect(within(screen.getByTestId("landing-faq")).getByText("¿Sirve si no uso SAP?")).toBeInTheDocument();
+  // every {name} mark of the texts was filled in
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+
+  // the other pages are linked at the bottom, and the language switch leads to the English version
+  const links = within(screen.getByTestId("page-links"));
+  expect(links.getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/");
+  expect(links.getByRole("link", { name: "Análisis de inventario en Excel" })).toHaveAttribute("href", "/analisis-inventario-excel/");
+  expect(links.queryByRole("link", { name: "Informe de conteo cíclico" })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/cycle-count-report/");
+
+  // the buttons are the ones of the home page: the example opens right here
+  fireEvent.click(screen.getByTestId("counts-sample"));
+  expect(await screen.findByText("Este es un ejemplo con datos inventados.")).toBeInTheDocument();
+});
+
+test("the cycle count page switches between its two languages in place", () => {
+  window.history.replaceState(null, "", "/en/cycle-count-report/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Cycle count report from your SAP Excel export");
+  expect(document.title).toBe("Cycle count report from your SAP Excel export · MiKardex");
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+  // English has this one page: the links at the bottom offer only the home page
+  expect(within(screen.getByTestId("page-links")).getAllByRole("link")).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Informe de conteo cíclico a partir del Excel de SAP");
+  expect(window.location.pathname).toBe("/conteo-ciclico-sap/");
+});
+
+test("a page in Spanish only stays in Spanish, and its English link leads to the English home page", () => {
+  window.history.replaceState(null, "", "/analisis-inventario-excel/");
+  window.localStorage.setItem("mikardex.lang", JSON.stringify("en")); // chose English on the home page before
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Análisis de inventario desde tu Excel, sin armar fórmulas");
+  expect(window.location.pathname).toBe("/analisis-inventario-excel/");
+  expect(screen.getByText(/consumo diario × días de reposición × 1,5\. Ese 50% extra/)).toBeInTheDocument();
+  expect(screen.getByText(/los productos que suman el primer 80% del consumo; clase B, hasta el 95%/)).toBeInTheDocument();
+  expect(screen.getByText(/3 subidas de tu Excel, 3 preguntas al asistente y las primeras 3 filas/)).toBeInTheDocument();
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+  expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
+
+  const english = screen.getByRole("link", { name: "EN" });
+  expect(english).toHaveAttribute("href", "/en/");
+  fireEvent.click(english);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
+  expect(window.location.pathname).toBe("/en/");
+});
+
+test("with a file already loaded, a page is still shown, with the way back to the file", () => {
+  const items = [{ sku: "A1", name: "Cafe", warehouse: "Main", stock: 2, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3, unit_cost: 10 }];
+  window.localStorage.setItem("mikardex.dataset", JSON.stringify({ source: "upload", fileName: "stock.xlsx", loadedAt: "2026-10-01T12:00:00.000Z", items }));
+  window.history.replaceState(null, "", "/analisis-inventario-excel/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Análisis de inventario desde tu Excel");
+  fireEvent.click(screen.getByTestId("continue"));
+  expect(screen.getAllByText(/stock\.xlsx/).length).toBeGreaterThan(0);
+  expect(screen.queryByRole("heading", { level: 2, name: "Qué obtienes" })).not.toBeInTheDocument();
+
+  // Home leads to the home page, not back to the page they arrived at
+  fireEvent.click(screen.getByTitle("Inicio"));
+  expect(screen.getByText("Quién está detrás")).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/");
+});
+
+test("the home page links to the pages that exist in its language", () => {
+  window.history.replaceState(null, "", "/");
+  render(<App />);
+  const links = within(screen.getByTestId("page-links"));
+  expect(links.getByRole("link", { name: "Informe de conteo cíclico" })).toHaveAttribute("href", "/conteo-ciclico-sap/");
+  expect(links.getByRole("link", { name: "Análisis de inventario en Excel" })).toHaveAttribute("href", "/analisis-inventario-excel/");
+  expect(screen.getByRole("link", { name: /Qué necesita tu Excel y cómo se calcula/ })).toHaveAttribute("href", "/analisis-inventario-excel/");
+  expect(screen.getByRole("link", { name: /Qué archivo sirve y cómo se mide/ })).toHaveAttribute("href", "/conteo-ciclico-sap/");
+
+  fireEvent.click(screen.getByRole("link", { name: "EN" }));
+  const english = within(screen.getByTestId("page-links"));
+  expect(english.getByRole("link", { name: "Cycle count report" })).toHaveAttribute("href", "/en/cycle-count-report/");
+  expect(english.getAllByRole("link")).toHaveLength(1);
+  expect(screen.getByRole("link", { name: /Which file works and how it is measured/ })).toHaveAttribute("href", "/en/cycle-count-report/");
+  // the analysis page has no English version yet: no link to it
+  expect(screen.queryByRole("link", { name: /What your Excel needs/ })).not.toBeInTheDocument();
 });

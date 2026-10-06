@@ -35,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
-import { LANGS, LOCALES, LANG_PATHS, langFromPath, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
+import { LANGS, LOCALES, LANG_PATHS, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, summarize, toNumber } from "./inventoryLogic";
 import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
 import { load, save, remove } from "./storage";
@@ -46,6 +46,9 @@ import { cleanCode } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HowItWorks, Plans, AboutAndData, Footer, PrivacyModal } from "./HomeSections";
+import LandingPage from "./LandingPage";
+import { landingText } from "./landingText";
+import { PAGES, pageFromPath, landingPagesIn } from "./pages";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
 import { chartData } from "./reportLogic";
 import { useReportDownload, ReportCard, DashboardDownload } from "./ReportDownloads";
@@ -141,7 +144,8 @@ function followLangLink(event, code, onChange) {
   onChange(code);
 }
 
-function LanguageToggle({ lang, onChange }) {
+// paths: where each language lives for the page being shown (the home page when not given)
+function LanguageToggle({ lang, onChange, paths = LANG_PATHS }) {
   return (
     <div
       role="group"
@@ -151,7 +155,7 @@ function LanguageToggle({ lang, onChange }) {
       {LANGS.map((code) => (
         <a
           key={code}
-          href={LANG_PATHS[code]}
+          href={paths[code] || LANG_PATHS[code]}
           hrefLang={code}
           onClick={(event) => followLangLink(event, code, onChange)}
           aria-current={lang === code ? "true" : undefined}
@@ -516,7 +520,8 @@ function playScanBeep() {
 
 // The second tool: conclusions from a cycle count report. Shown on the home page and, while no
 // report is loaded, in the cycle count tab. counts is the report loaded in this visit, if any.
-function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false }) {
+// more: the address of the page that explains the report in full (only given on the home page)
+function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false, more }) {
   return (
     <section
       data-testid="counts-band"
@@ -550,25 +555,95 @@ function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false 
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-        {counts && (
-          <button onClick={onContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("countsBack", { name: counts.fileName })}</span>
-            <ArrowRight size={15} style={{ flexShrink: 0 }} />
-          </button>
-        )}
-        <button onClick={onUpload} data-testid="counts-upload" style={{ ...(counts ? secondaryButton : primaryButton), padding: "12px 20px" }}>
-          <Upload size={15} /> {t("countsUpload")}
+      <CountButtons t={t} counts={counts} onUpload={onUpload} onSample={onSample} onContinue={onContinue} />
+      <CountsPrivacy t={t} />
+      {more && (
+        <a href={more} style={{ ...moreLink, marginTop: 14 }}>
+          {t("countsMore")} <ArrowRight size={14} />
+        </a>
+      )}
+    </section>
+  );
+}
+
+// The ways into the cycle count report: back to the one loaded in this visit, upload one, or the example
+function CountButtons({ t, counts, onUpload, onSample, onContinue }) {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+      {counts && (
+        <button onClick={onContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("countsBack", { name: counts.fileName })}</span>
+          <ArrowRight size={15} style={{ flexShrink: 0 }} />
         </button>
-        <button onClick={onSample} data-testid="counts-sample" style={{ ...secondaryButton, padding: "12px 20px" }}>
-          {t("countsSample")} <ArrowRight size={15} />
+      )}
+      <button onClick={onUpload} data-testid="counts-upload" style={{ ...(counts ? secondaryButton : primaryButton), padding: "12px 20px" }}>
+        <Upload size={15} /> {t("countsUpload")}
+      </button>
+      <button onClick={onSample} data-testid="counts-sample" style={{ ...secondaryButton, padding: "12px 20px" }}>
+        {t("countsSample")} <ArrowRight size={15} />
+      </button>
+    </div>
+  );
+}
+
+function CountsPrivacy({ t }) {
+  return (
+    <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: 0 }}>
+      <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
+      {t("countsPrivacy")}
+    </p>
+  );
+}
+
+// A link from a block of the home page to the page that explains it in full
+const moreLink = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 13.5,
+  fontWeight: 600,
+  color: COLORS.ink,
+  textDecoration: "underline",
+  textUnderlineOffset: 3,
+};
+
+// The ways into the inventory tool: back to the file already loaded, upload one, or the sample data
+function StartButtons({ t, current, onContinue, onUpload, onSample }) {
+  return (
+    <>
+      {/* Someone who already loaded a file gets the way back to it first */}
+      {current && (
+        <button
+          onClick={onContinue}
+          data-testid="continue"
+          style={{ ...primaryButton, padding: "14px 24px", fontSize: 13, marginBottom: 12, maxWidth: "100%" }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("continueWith", { name: current.name })}</span>
+          <ArrowRight size={15} style={{ flexShrink: 0 }} />
+        </button>
+      )}
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <button
+          onClick={() => {
+            playScanBeep();
+            onUpload();
+          }}
+          style={{ ...(current ? secondaryButton : primaryButton), padding: "14px 24px", fontSize: 13 }}
+        >
+          <Upload size={15} /> {current && current.isUpload ? t("replaceData") : t("uploadCta")}
+        </button>
+        <button
+          onClick={() => {
+            playScanBeep();
+            setTimeout(onSample, 150);
+          }}
+          style={{ ...secondaryButton, padding: "14px 24px", fontSize: 13 }}
+        >
+          {t("sampleCta")} <ArrowRight size={15} />
         </button>
       </div>
-      <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: 0 }}>
-        <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
-        {t("countsPrivacy")}
-      </p>
-    </section>
+    </>
   );
 }
 
@@ -638,38 +713,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
 
       <p style={{ fontSize: 15.5, color: COLORS.inkMuted, maxWidth: 470, lineHeight: 1.6, margin: "0 0 28px" }}>{t("tagline")}</p>
 
-      {/* Someone who already loaded a file gets the way back to it first */}
-      {current && (
-        <button
-          onClick={onContinue}
-          data-testid="continue"
-          style={{ ...primaryButton, padding: "14px 24px", fontSize: 13, marginBottom: 12, maxWidth: "100%" }}
-        >
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("continueWith", { name: current.name })}</span>
-          <ArrowRight size={15} style={{ flexShrink: 0 }} />
-        </button>
-      )}
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-        <button
-          onClick={() => {
-            playScanBeep();
-            onUpload();
-          }}
-          style={{ ...(current ? secondaryButton : primaryButton), padding: "14px 24px", fontSize: 13 }}
-        >
-          <Upload size={15} /> {current && current.isUpload ? t("replaceData") : t("uploadCta")}
-        </button>
-        <button
-          onClick={() => {
-            playScanBeep();
-            setTimeout(onSample, 150);
-          }}
-          style={{ ...secondaryButton, padding: "14px 24px", fontSize: 13 }}
-        >
-          {t("sampleCta")} <ArrowRight size={15} />
-        </button>
-      </div>
+      <StartButtons t={t} current={current} onContinue={onContinue} onUpload={onUpload} onSample={onSample} />
 
       <p style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLORS.ink, letterSpacing: "0.03em", margin: "20px 0 6px" }}>
         {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })}
@@ -697,13 +741,20 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
       </div>
 
       {/* First the main tool is explained; the cycle count report comes after it, as a second tool */}
-      <HowItWorks t={t} />
-      <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} />
+      <HowItWorks t={t} more={PAGES.analysis[lang]} />
+      <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} more={PAGES.counts[lang]} />
       <Plans t={t} lang={lang} onPlan={onPlan} />
       <AboutAndData t={t} onPrivacy={onPrivacy} />
-      <Footer t={t} onPrivacy={onPrivacy} />
+      <Footer t={t} onPrivacy={onPrivacy} links={pageLinks(lang, t, "home")} />
     </div>
   );
+}
+
+// The links at the bottom of every page: the home page and the pages written for one search each,
+// in the language being shown and without the page the visitor is already on.
+function pageLinks(lang, t, current) {
+  const links = landingPagesIn(lang).map((id) => ({ id, href: PAGES[id][lang], label: landingText(id, lang).navLabel }));
+  return [{ id: "home", href: PAGES.home[lang], label: t("home") }, ...links].filter((entry) => entry.id !== current);
 }
 
 function loadStoredDataset() {
@@ -731,16 +782,25 @@ export default function InventoryAssistant({ path }) {
   useGoogleFonts();
   const isMobile = useIsMobile();
 
+  // The page of the address the visitor arrived at (src/pages.js)
+  const [startAt] = useState(() => pageFromPath(path !== undefined ? path : window.location.pathname));
+  const [page, setPage] = useState(startAt.id);
   const [lang, setLang] = useState(() => {
-    // A language the visitor chose before comes first; for everyone else the address decides.
+    // A page written for one search is in the language of its address.
+    if (startAt.id !== "home") return startAt.lang;
+    // On the home page a language the visitor chose before comes first; for everyone else the address decides.
     const stored = load("lang", null);
-    if (LANGS.includes(stored)) return stored;
-    return langFromPath(path !== undefined ? path : window.location.pathname);
+    return LANGS.includes(stored) ? stored : startAt.lang;
   });
   const t = useMemo(() => translator(lang), [lang]);
+  // A page that does not exist in the language being shown gives way to the home page
+  const shownPage = PAGES[page][lang] ? page : "home";
+  const address = PAGES[shownPage][lang];
 
   const [dataset, setDataset] = useState(loadStoredDataset);
-  const [hasEntered, setHasEntered] = useState(() => dataset !== null);
+  // Someone with a file already loaded goes straight to the tool, except when they arrive at a
+  // page they came to read: the page is shown, with the way back to their file on it.
+  const [hasEntered, setHasEntered] = useState(() => dataset !== null && startAt.id === "home");
   const [uploadsUsed, setUploadsUsed] = useState(() => Number(load("uploadsUsed", 0)) || 0);
   const [questionsUsed, setQuestionsUsed] = useState(() => Number(load("questionsUsed", 0)) || 0);
   const [accessCode, setAccessCode] = useState(() => String(load("accessCode", "") || ""));
@@ -793,12 +853,12 @@ export default function InventoryAssistant({ path }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = t("seoTitle");
-    // The address follows the language, so a link copied from the address bar opens in the same language.
-    if (langFromPath(window.location.pathname) !== lang) {
-      window.history.replaceState(window.history.state, "", LANG_PATHS[lang] + window.location.search + window.location.hash);
+    document.title = shownPage === "home" ? t("seoTitle") : landingText(shownPage, lang).seoTitle;
+    // The address follows the page and the language, so a link copied from the address bar opens the same thing.
+    if (window.location.pathname !== address) {
+      window.history.replaceState(window.history.state, "", address + window.location.search + window.location.hash);
     }
-  }, [lang, t]);
+  }, [lang, t, shownPage, address]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -878,6 +938,7 @@ export default function InventoryAssistant({ path }) {
 
   // Back to the home page. The loaded data stays; the home page offers the way back to it.
   function goHome() {
+    setPage("home");
     setHasEntered(false);
     setShowCounts(false);
     setView("assistant");
@@ -1330,6 +1391,40 @@ export default function InventoryAssistant({ path }) {
         </div>
         {modals}
       </div>
+    );
+  }
+
+  if (!hasEntered && shownPage !== "home") {
+    // Each page offers the tool it is about, with the same buttons as the home page
+    const forCounts = shownPage === "counts";
+    return (
+      <>
+        <GlobalStyles />
+        <LandingPage
+          id={shownPage}
+          lang={lang}
+          t={t}
+          toggle={<LanguageToggle lang={lang} onChange={changeLang} paths={PAGES[shownPage]} />}
+          actions={
+            forCounts ? (
+              <CountButtons t={t} counts={counts} onUpload={openCountImport} onSample={loadSampleCounts} onContinue={showCountReport} />
+            ) : (
+              <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />
+            )
+          }
+          note={
+            forCounts ? (
+              <CountsPrivacy t={t} />
+            ) : (
+              <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "16px 0 0", maxWidth: 720 }}>
+                {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}
+              </p>
+            )
+          }
+          footer={<Footer t={t} onPrivacy={openPrivacy} links={pageLinks(lang, t, shownPage)} />}
+        />
+        {modals}
+      </>
     );
   }
 
