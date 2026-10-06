@@ -15,8 +15,7 @@ export const CONTACT_EMAIL = "hola@mikardex.cl";
 
 // The public address of the site, with www and without a final slash. It is what Google is told
 // is the official address of each page (the canonical link), so it has to be the one that loads
-// without redirecting. If it changes, change it also in public/index.html, public/sitemap.xml
-// and public/robots.txt.
+// without redirecting. If it changes, change it also in public/index.html and public/robots.txt.
 export const SITE_URL = "https://www.mikardex.cl";
 
 // Import defaults

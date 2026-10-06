@@ -12,6 +12,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **Cycle count report** — upload the count report downloaded from SAP or a warehouse system and get the conclusions written out, with charts and an Excel report. Two kinds of file work: a list of locations with the date of their last count (coverage, locations outside the cycle, locations never counted, the weekly pace needed), and a line-by-line count or adjustment report (accuracy by line and by location, value of the differences, reasons, areas, repeat locations, possible lot mix-ups, posting delay). It is computed entirely in the browser: the file is never sent to the server or to the AI, and it is not saved.
 - **Summary on load** — right after a file loads, three cards say what runs out first, how many products need an order, and how much stock is not moving. No question needed.
 - **English and Spanish** — each language has its own address (`mikardex.cl/` in Spanish, `mikardex.cl/en/` in English) and can be switched at any time; answers, reports and Excel exports come out in the same language. See [Search engines](#search-engines).
+- **A page for each need** — the cycle count report and the inventory analysis each have their own page, which explains what the tool answers, which file works and how the figures are calculated. See [Pages for specific searches](#pages-for-specific-searches).
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
 - **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000. It downloads as a PowerPoint file: one slide per chart, each with what it shows and what to do, with charts and text that can be edited.
@@ -193,12 +194,28 @@ What Google needs to find the page, read it and show it in the right language.
 
 - **One address per language** — `https://www.mikardex.cl/` is Spanish and `https://www.mikardex.cl/en/` is English (`LANG_PATHS` in `src/i18n.js`). The address decides the language, not the visitor's browser: Google browses in English, so a page that follows the browser is only ever read in English. A language the visitor picked with the ES / EN switch is remembered and comes first. A new visitor whose browser is in the other language gets a small link to it next to the switch.
 - **Title and description** — `seoTitle` and `seoDescription` in `src/i18n.js`, one per language. They are the blue title and the two lines of a Google result, and the text of the preview when the link is shared.
-- **The text is in the HTML** — the page is drawn by JavaScript, so on its own the HTML has no text. After `react-scripts build`, `scripts/prerender.js` draws the home page with the page's own components and texts and writes it into `build/index.html` (Spanish) and `build/en/index.html` (English), each with its title, description, canonical address, links to the other language (`hreflang`), preview data and structured data. Nothing is written twice: change a text in `src/i18n.js` and the next build carries it. React draws the live page over it when it loads.
+- **The text is in the HTML** — the page is drawn by JavaScript, so on its own the HTML has no text. After `react-scripts build`, `scripts/prerender.js` draws every page of the site with the page's own components and texts and writes each one into its own file (`build/index.html`, `build/en/index.html`, `build/conteo-ciclico-sap/index.html`...), with its title, description, canonical address, links to its version in the other language (`hreflang`), preview data and structured data. Nothing is written twice: change a text and the next build carries it. React draws the live page over it when it loads.
 - **It runs with the build** — `npm run build` does both steps. If the script finds something unexpected it stops with an error, the build fails and the published site stays as it was. Vercel has to build with `npm run build` (its default).
-- **Official address** — `SITE_URL` in `src/config.js` (`https://www.mikardex.cl`, with `www`). `mikardex.cl` without `www` redirects to it, so it is the one named in the canonical link, `public/sitemap.xml` and `public/robots.txt`.
-- **New pages** — add a `<url>` block to `public/sitemap.xml` for each one.
+- **Official address** — `SITE_URL` in `src/config.js` (`https://www.mikardex.cl`, with `www`). `mikardex.cl` without `www` redirects to it, so it is the one named in the canonical link, the sitemap and `public/robots.txt`.
+- **Sitemap** — `sitemap.xml` is written by the build from the list of pages, so it never has to be edited by hand.
 - **After publishing a change to the texts** — in Google Search Console, inspect `https://www.mikardex.cl/` and press "Request indexing" so Google reads it again soon.
-- **Tests** — `src/seoPage.test.js` (addresses, tags, sitemap) and the last tests of `src/App.test.js` (language and address).
+- **Tests** — `src/seoPage.test.js` (addresses, tags, sitemap) and the last tests of `src/App.test.js` (language, address and the pages below).
+
+### Pages for specific searches
+
+The home page can only rank for a few searches. Each of these pages is written for one need, with the words people type, and offers the tool right there with the same buttons as the home page.
+
+| Page | Spanish | English |
+|---|---|---|
+| Cycle count report | `/conteo-ciclico-sap/` | `/en/cycle-count-report/` |
+| Inventory analysis from an Excel file | `/analisis-inventario-excel/` | — |
+
+- **Addresses** — `src/pages.js`. A page can exist in one language only; its language is the one of its address.
+- **Texts** — `src/landingText.js`: title and description for Google, heading, sections, questions. Prices, limits and the numbers of the formulas are `{name}` marks filled in from `src/config.js` (the list is `landingVars` in `src/LandingPage.jsx`), so a page cannot state something the tool does not do. Everything else in the text has to be kept true by hand when the tool changes.
+- **Layout** — `src/LandingPage.jsx`. Which buttons each page shows is decided in `src/InventoryAssistant.jsx`, where the page is rendered.
+- **Links** — every page lists the others at the bottom, and the home page links to each one from the block it explains. Google finds a page through the links to it, so a page with no links barely counts.
+- **To add a page** — add its address to `src/pages.js` and its texts to `src/landingText.js`. The build writes its HTML and adds it to the sitemap. Then, in Search Console, inspect the new address and press "Request indexing".
+- **Someone with a file already loaded** who arrives at one of these pages sees the page, with the button to continue with their file, instead of going straight to the tool.
 
 ## Sample dataset
 

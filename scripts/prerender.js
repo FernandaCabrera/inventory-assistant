@@ -2,14 +2,16 @@
 //
 // The page is drawn by JavaScript, so the HTML that the build leaves has no text in it. Google
 // can run JavaScript, but it does so later and not always; other search engines, AI assistants
-// and the previews in WhatsApp or LinkedIn do not run it at all. This script writes the home
-// page into the HTML, once per language:
+// and the previews in WhatsApp or LinkedIn do not run it at all. This script writes every page
+// of the site (src/pages.js) into its own HTML file, for example:
 //
-//   build/index.html      Spanish  ->  https://www.mikardex.cl/
-//   build/en/index.html   English  ->  https://www.mikardex.cl/en/
+//   build/index.html                       ->  https://www.mikardex.cl/
+//   build/en/index.html                    ->  https://www.mikardex.cl/en/
+//   build/conteo-ciclico-sap/index.html    ->  https://www.mikardex.cl/conteo-ciclico-sap/
 //
-// Each one gets its own title, description, canonical and hreflang (scripts/seoPage.js).
-// The texts are the ones in src/i18n.js: nothing is written twice.
+// Each one gets its own title, description, canonical and hreflang (scripts/seoPage.js), and
+// all of them go into build/sitemap.xml. The texts are the ones in src/i18n.js and
+// src/landingText.js: nothing is written twice.
 //
 // If anything is not as expected the script stops with an error, the build fails and the site
 // that is already published stays as it is.
@@ -18,7 +20,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const esbuild = require("esbuild");
-const { seoPage } = require("./seoPage");
+const { seoPage, sitemapXml, escapeHtml } = require("./seoPage");
 
 const root = path.join(__dirname, "..");
 const buildDir = path.join(root, "build");
@@ -58,18 +60,25 @@ async function main() {
 
   const { site, pages } = await drawPages();
 
-  for (const page of pages) {
-    // The drawn page has to be the home page, in its language, with its texts
-    check(page.html.includes("<h1"), `the ${page.lang} page has no <h1>`);
-    check(page.html.includes(page.h1), `the ${page.lang} page does not show its heading "${page.h1}"`);
-    check(page.title && page.description, `the ${page.lang} page has no title or description (seoTitle, seoDescription in src/i18n.js)`);
+  check(new Set(pages.map((page) => page.path)).size === pages.length, "two pages have the same address (src/pages.js)");
 
-    const html = seoPage(template, page, pages, site);
+  for (const page of pages) {
+    // What was drawn has to be this page, in its language, with its texts
+    const name = `${page.id} (${page.lang})`;
+    check(page.title && page.description && page.h1, `the page ${name} has no title, description or heading`);
+    check(page.html.includes("<h1"), `the page ${name} has no <h1>`);
+    check(page.html.includes(escapeHtml(page.h1)), `the page ${name} does not show its heading "${page.h1}"`);
+    check(!/\{\w+\}/.test(page.html.replace(/<style[\s\S]*?<\/style>/g, "")), `the page ${name} shows a {name} mark that was not filled in`);
+
+    const html = seoPage(template, page, site);
     const file = path.join(buildDir, page.path, "index.html");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, html);
     console.log(`prerender: ${path.relative(root, file)}  (${page.lang}, ${site.url}${page.path}, ${Math.round(html.length / 1024)} kB)`);
   }
+
+  fs.writeFileSync(path.join(buildDir, "sitemap.xml"), sitemapXml(pages, site));
+  console.log(`prerender: build/sitemap.xml  (${pages.length} pages)`);
 }
 
 main().catch((err) => {

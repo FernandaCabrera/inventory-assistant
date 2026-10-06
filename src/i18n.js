@@ -273,6 +273,7 @@ const STRINGS = {
     plansPaidNote: "Paid with PayPal. Cancel whenever you want.",
     plansCta: "See the plan",
     howTitle: "How it works",
+    howMore: "What your Excel needs and how it is calculated",
     howSteps: [
       { h: "Upload your Excel", p: "An export from Excel, Shopify, QuickBooks or another system. It needs product, stock and units sold." },
       { h: "Check the columns", p: "The tool recognizes them and you confirm. It takes under a minute." },
@@ -329,6 +330,7 @@ const STRINGS = {
     ],
     countsUpload: "Upload a count report",
     countsSample: "See an example",
+    countsMore: "Which file works and how it is measured",
     countsBack: "Back to the report: {name}",
     countsPrivacy: "It is analyzed in your browser. The report is not sent to any server or to the AI.",
     countImportTitle: "Upload your count report",
@@ -1086,6 +1088,7 @@ const STRINGS = {
     plansPaidNote: "Se paga con PayPal. Cancelas cuando quieras.",
     plansCta: "Ver el plan",
     howTitle: "Cómo funciona",
+    howMore: "Qué necesita tu Excel y cómo se calcula",
     howSteps: [
       { h: "Sube tu Excel", p: "Un archivo exportado de Excel, Bsale, Shopify u otro sistema. Necesita producto, stock y unidades vendidas." },
       { h: "Revisa las columnas", p: "La herramienta las reconoce y tú confirmas. Toma menos de un minuto." },
@@ -1142,6 +1145,7 @@ const STRINGS = {
     ],
     countsUpload: "Subir reporte de conteos",
     countsSample: "Ver un ejemplo",
+    countsMore: "Qué archivo sirve y cómo se mide",
     countsBack: "Volver al informe: {name}",
     countsPrivacy: "Se analiza en tu navegador. El reporte no se envía a ningún servidor ni a la IA.",
     countImportTitle: "Sube tu reporte de conteos",
