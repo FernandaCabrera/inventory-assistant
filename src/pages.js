@@ -5,8 +5,8 @@
 //
 // To add a page: add it here with its address and write its texts in src/landingText.js. The
 // build writes it into the HTML and into sitemap.xml by itself (scripts/prerender.js). A new page
-// shows the buttons of the inventory tool; src/InventoryAssistant.jsx, where LandingPage is
-// rendered, is the place to give it other buttons.
+// shows the buttons of the inventory tool; src/InventoryAssistant.jsx (landingButtons) is the
+// place to give it other buttons.
 
 import { LANGS, LANG_PATHS, langFromPath } from "./i18n";
 
@@ -14,6 +14,8 @@ export const PAGES = {
   home: LANG_PATHS,
   counts: { es: "/conteo-ciclico-sap/", en: "/en/cycle-count-report/" },
   analysis: { es: "/analisis-inventario-excel/" },
+  // A service, not a tool: its button writes an email instead of opening the tool
+  excel: { es: "/automatizacion-excel/", en: "/en/excel-automation/" },
 };
 
 // Every page that is not the tool itself

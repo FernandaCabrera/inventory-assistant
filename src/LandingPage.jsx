@@ -21,6 +21,8 @@ import {
   DEFAULT_LEAD_TIME_DAYS,
   MAX_ROWS,
   COUNT_MAX_LINES,
+  CONTACT_EMAIL,
+  OWNER_NAME,
 } from "./config";
 
 // The values behind the {name} marks of src/landingText.js. They come from the same settings the
@@ -40,6 +42,8 @@ export function landingVars(lang, t) {
     abcB: formatNumber(lang, ABC_B_SHARE * 100),
     maxRows: formatNumber(lang, MAX_ROWS),
     maxLines: formatNumber(lang, COUNT_MAX_LINES),
+    email: CONTACT_EMAIL,
+    name: OWNER_NAME,
   };
 }
 
@@ -92,9 +96,24 @@ function Block({ item, vars }) {
   );
 }
 
+// The link of the closing block
+export const bottomLink = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  fontFamily: FONT_MONO,
+  fontSize: 12.5,
+  fontWeight: 600,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  color: COLORS.ink,
+  textUnderlineOffset: 4,
+};
+
 // id, lang: which page (src/pages.js). toggle: the language switch. actions: the buttons that
 // start the tool. note: the small print under them. footer: the links at the bottom.
-export default function LandingPage({ id, lang, t, toggle, actions, note, footer }) {
+// closing: what the last block offers; when not given, a link back up to the buttons.
+export default function LandingPage({ id, lang, t, toggle, actions, note, closing, footer }) {
   const page = landingText(id, lang);
   const vars = landingVars(lang, t);
   return (
@@ -150,13 +169,12 @@ export default function LandingPage({ id, lang, t, toggle, actions, note, footer
 
         <section style={{ ...box, border: `1px solid ${COLORS.ink}`, paddingBottom: 24 }}>
           <h2 style={h2}>{page.bottom.h}</h2>
-          <p style={text}>{page.bottom.p}</p>
-          <a
-            href="#top"
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: FONT_MONO, fontSize: 12.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: COLORS.ink, textUnderlineOffset: 4 }}
-          >
-            <ArrowUp size={15} /> {page.bottom.link}
-          </a>
+          <p style={text}>{fill(page.bottom.p, vars)}</p>
+          {closing || (
+            <a href="#top" style={bottomLink}>
+              <ArrowUp size={15} /> {page.bottom.link}
+            </a>
+          )}
         </section>
       </main>
 

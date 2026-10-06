@@ -6,7 +6,10 @@
 //   - In "body", a text between quotes is a paragraph, a list in [ ] is a list of points, and
 //     { steps: [ ] } is a numbered list.
 //   - {name} marks a value filled in from src/config.js (prices, limits, the numbers of the
-//     formulas), so it is never written twice. The list of names is in src/LandingPage.jsx.
+//     formulas, the contact email), so it is never written twice. The list of names is in
+//     src/LandingPage.jsx.
+//   - A page about a service has "cta" (the text of its button, which writes an email),
+//     "mailSubject" (the subject of that email) and "note" (the line under the button).
 //   - Everything said here has to be true of the tool today. If the tool changes, change the text.
 
 const TEXT = {
@@ -292,6 +295,136 @@ const TEXT = {
         },
       ],
       bottom: { h: "Pruébalo con tu Excel o con los datos de ejemplo", p: "Los datos de ejemplo abren todo, incluido el dashboard y las descargas.", link: "Subir mi Excel o ver el ejemplo" },
+    },
+  },
+
+  // Excel automation: a service done by hand, for any area of a business. It says only what
+  // the service is: what is done, with what, and how to ask. No prices and no promised times.
+  excel: {
+    es: {
+      navLabel: "Automatización de Excel",
+      seoTitle: "Automatización de Excel a medida para tu negocio · MiKardex",
+      seoDescription:
+        "¿Tu Excel toma horas o dejó de funcionar? Lo automatizo, lo arreglo o creo uno desde cero, para cualquier área de tu negocio y no solo inventario. Con IA y fórmulas. Escríbeme.",
+      eyebrow: "Servicio · Excel a medida",
+      h1: "Automatización de Excel para tu negocio",
+      lead: "Si tienes un Excel que te toma horas, o uno que dejó de funcionar, lo tomo tal como está y te ayudo a automatizarlo o a arreglarlo. Si todavía no existe, lo creo desde cero. Y no tiene que ser de inventario: puede ser de cualquier área de tu negocio.",
+      cta: "Escribir por correo",
+      mailSubject: "Automatización de Excel",
+      note: "{email} · {name}, creadora de MiKardex",
+      sections: [
+        {
+          h: "Qué puedo hacer con tu Excel",
+          body: [
+            [
+              "Automatizarlo: tomo el Excel que ya tienes y hago que lo que hoy armas a mano se calcule solo.",
+              "Arreglarlo: fórmulas que dan error, resultados que no cuadran o un archivo que ya nadie quiere tocar.",
+              "Crearlo desde cero: si todavía no tienes el Excel, lo armo según lo que necesitas.",
+            ],
+          ],
+        },
+        {
+          h: "No solo inventario",
+          body: [
+            "MiKardex partió por el inventario, pero este servicio es para cualquier área de tu negocio: ventas, compras, gastos, informes o lo que hoy lleves en una planilla.",
+          ],
+        },
+        {
+          h: "Cómo lo hago",
+          body: [
+            "Trabajo con inteligencia artificial y con fórmulas que aplico yo misma. El resultado es tu Excel funcionando.",
+            "Soy {name}, creadora de MiKardex y especialista en control de inventario.",
+          ],
+        },
+        {
+          h: "Cómo empezar",
+          body: [
+            {
+              steps: [
+                "Escribe a {email} y cuéntame qué Excel tienes, o cuál necesitas, y qué quieres que haga.",
+                "Te respondo y vemos por correo las preguntas que tengas.",
+              ],
+            },
+          ],
+        },
+        {
+          h: "Cuánto cuesta",
+          body: ["Depende de lo que haya que hacer. Escribe a {email} con lo que necesitas y te respondo."],
+        },
+      ],
+      faqTitle: "Preguntas frecuentes",
+      faq: [
+        { q: "¿Tiene que ser un Excel de inventario?", a: "No. Puede ser de cualquier área de tu negocio." },
+        { q: "¿Y si todavía no tengo ningún Excel?", a: "Lo creo desde cero, según lo que necesites." },
+        {
+          q: "¿En qué se diferencia de la herramienta de MiKardex?",
+          a: "La herramienta analiza tu inventario al momento: subes tu Excel y ves qué reponer y qué no se vende. Este servicio es un trabajo a medida sobre tu propio archivo, sea de inventario o no.",
+        },
+      ],
+      bottom: { h: "Cuéntame qué necesitas", p: "Escribe a {email}. Puedes preguntar lo que quieras.", link: "Escribir por correo" },
+    },
+
+    en: {
+      navLabel: "Excel automation",
+      seoTitle: "Custom Excel automation for your business · MiKardex",
+      seoDescription:
+        "Does your Excel take hours or no longer work? I automate it, fix it or build one from scratch, for any area of your business and not only inventory. With AI and formulas. Write to me.",
+      eyebrow: "Service · Excel built for you",
+      h1: "Excel automation for your business",
+      lead: "If you have an Excel file that takes you hours, or one that stopped working, I take it as it is and help you automate it or fix it. If it does not exist yet, I build it from scratch. And it does not have to be about inventory: it can be for any area of your business.",
+      cta: "Write by email",
+      mailSubject: "Excel automation",
+      note: "{email} · {name}, creator of MiKardex",
+      sections: [
+        {
+          h: "What I can do with your Excel",
+          body: [
+            [
+              "Automate it: I take the Excel you already have and make what you put together by hand today work itself out.",
+              "Fix it: formulas that give errors, results that do not add up or a file nobody wants to touch any more.",
+              "Build it from scratch: if you do not have the Excel yet, I build it around what you need.",
+            ],
+          ],
+        },
+        {
+          h: "Not only inventory",
+          body: [
+            "MiKardex started with inventory, but this service is for any area of your business: sales, purchasing, expenses, reports or whatever you keep in a spreadsheet today.",
+          ],
+        },
+        {
+          h: "How I do it",
+          body: [
+            "I work with artificial intelligence and with formulas I apply myself. The result is your Excel, working.",
+            "I am {name}, creator of MiKardex and an inventory control specialist.",
+          ],
+        },
+        {
+          h: "How to start",
+          body: [
+            {
+              steps: [
+                "Write to {email} and tell me which Excel you have, or which one you need, and what you want it to do.",
+                "I reply and we go over any questions you have by email.",
+              ],
+            },
+          ],
+        },
+        {
+          h: "What it costs",
+          body: ["It depends on what has to be done. Write to {email} with what you need and I will reply."],
+        },
+      ],
+      faqTitle: "Frequently asked questions",
+      faq: [
+        { q: "Does it have to be an inventory spreadsheet?", a: "No. It can be for any area of your business." },
+        { q: "What if I do not have any Excel yet?", a: "I build it from scratch, around what you need." },
+        {
+          q: "How is it different from the MiKardex tool?",
+          a: "The tool analyzes your inventory on the spot: you upload your Excel and see what to reorder and what is not selling. This service is custom work on your own file, whether it is about inventory or not.",
+        },
+      ],
+      bottom: { h: "Tell me what you need", p: "Write to {email}. You can ask anything you want.", link: "Write by email" },
     },
   },
 };
