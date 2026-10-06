@@ -1,0 +1,462 @@
+[
+  {
+    "sku": "MK-1006",
+    "name": "Pechuga de pollo congelada (caja 5 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 4,
+    "reorder_point": 22,
+    "lead_time_days": 3,
+    "avg_daily_usage": 6,
+    "unit_cost": 21900
+  },
+  {
+    "sku": "MK-1013",
+    "name": "Carne molida congelada (caja 10 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 14,
+    "reorder_point": 63,
+    "lead_time_days": 4,
+    "avg_daily_usage": 12,
+    "unit_cost": 62000
+  },
+  {
+    "sku": "MK-1019",
+    "name": "Filetes de salmón congelados (caja 3 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 72,
+    "reorder_point": 36,
+    "lead_time_days": 3,
+    "avg_daily_usage": 10,
+    "unit_cost": 38500
+  },
+  {
+    "sku": "MK-1023",
+    "name": "Mix de verduras congeladas (bolsa 10 kg)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 14,
+    "reorder_point": 21,
+    "lead_time_days": 7,
+    "avg_daily_usage": 2,
+    "unit_cost": 16900
+  },
+  {
+    "sku": "MK-1031",
+    "name": "Brócoli congelado (bolsa 8 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 81,
+    "reorder_point": 48,
+    "lead_time_days": 6,
+    "avg_daily_usage": 7,
+    "unit_cost": 15200
+  },
+  {
+    "sku": "MK-1038",
+    "name": "Camote frito congelado (bolsa 6 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 58,
+    "reorder_point": 21,
+    "lead_time_days": 7,
+    "avg_daily_usage": 2,
+    "unit_cost": 14800
+  },
+  {
+    "sku": "MK-1046",
+    "name": "Proteína de suero en polvo (granel 25 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 325,
+    "reorder_point": 127,
+    "lead_time_days": 14,
+    "avg_daily_usage": 6,
+    "unit_cost": 245000
+  },
+  {
+    "sku": "MK-1054",
+    "name": "Proteína vegetal en polvo (granel 20 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 31,
+    "reorder_point": 11,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2,
+    "unit_cost": 198000
+  },
+  {
+    "sku": "MK-1058",
+    "name": "Harina de almendra (saco 15 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 107,
+    "reorder_point": 80,
+    "lead_time_days": 10,
+    "avg_daily_usage": 6,
+    "unit_cost": 132000
+  },
+  {
+    "sku": "MK-1066",
+    "name": "Aceite de coco (tambor 20 L)",
+    "warehouse": "CD Lampa",
+    "stock": 202,
+    "reorder_point": 150,
+    "lead_time_days": 7,
+    "avg_daily_usage": 15,
+    "unit_cost": 86000
+  },
+  {
+    "sku": "MK-1076",
+    "name": "Aceite de oliva (tambor 20 L)",
+    "warehouse": "CD Lampa",
+    "stock": 308,
+    "reorder_point": 58,
+    "lead_time_days": 5,
+    "avg_daily_usage": 9,
+    "unit_cost": 124000
+  },
+  {
+    "sku": "MK-1082",
+    "name": "Arroz integral (saco 25 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 5,
+    "reorder_point": 19,
+    "lead_time_days": 8,
+    "avg_daily_usage": 2,
+    "unit_cost": 32500
+  },
+  {
+    "sku": "MK-1087",
+    "name": "Quinoa (saco 20 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 88,
+    "reorder_point": 111,
+    "lead_time_days": 6,
+    "avg_daily_usage": 12,
+    "unit_cost": 68000
+  },
+  {
+    "sku": "MK-1095",
+    "name": "Film para envasado al vacío (rollo)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 70,
+    "reorder_point": 35,
+    "lead_time_days": 5,
+    "avg_daily_usage": 6,
+    "unit_cost": 27500
+  },
+  {
+    "sku": "MK-1104",
+    "name": "Envases para comida preparada (caja 150 un.)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 148,
+    "reorder_point": 156,
+    "lead_time_days": 10,
+    "avg_daily_usage": 12,
+    "unit_cost": 24900
+  },
+  {
+    "sku": "MK-1110",
+    "name": "Etiquetas nutricionales (rollo 5.000 un.)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 7,
+    "reorder_point": 12,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2,
+    "unit_cost": 39000
+  },
+  {
+    "sku": "MK-1118",
+    "name": "Cajas de despacho medianas (pack 50 un.)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 203,
+    "reorder_point": 41,
+    "lead_time_days": 4,
+    "avg_daily_usage": 8,
+    "unit_cost": 28500
+  },
+  {
+    "sku": "MK-1124",
+    "name": "Fundas térmicas de despacho (pack 25 un.)",
+    "warehouse": "Planta Quilicura",
+    "stock": 223,
+    "reorder_point": 93,
+    "lead_time_days": 4,
+    "avg_daily_usage": 15,
+    "unit_cost": 33000
+  },
+  {
+    "sku": "MK-1129",
+    "name": "Gel packs reutilizables (caja 200 un.)",
+    "warehouse": "Planta Quilicura",
+    "stock": 24,
+    "reorder_point": 66,
+    "lead_time_days": 7,
+    "avg_daily_usage": 8,
+    "unit_cost": 58000
+  },
+  {
+    "sku": "MK-1139",
+    "name": "Sal de mar (saco 10 kg)",
+    "warehouse": "CD Maipú",
+    "stock": 26,
+    "reorder_point": 76,
+    "lead_time_days": 14,
+    "avg_daily_usage": 4,
+    "unit_cost": 7900
+  },
+  {
+    "sku": "MK-1146",
+    "name": "Pimienta negra (bolsa 5 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 29,
+    "reorder_point": 31,
+    "lead_time_days": 6,
+    "avg_daily_usage": 4,
+    "unit_cost": 44000
+  },
+  {
+    "sku": "MK-1152",
+    "name": "Ajo en polvo (bolsa 8 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 488,
+    "reorder_point": 80,
+    "lead_time_days": 8,
+    "avg_daily_usage": 9,
+    "unit_cost": 36500
+  },
+  {
+    "sku": "MK-1157",
+    "name": "Paprika (bolsa 5 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 80,
+    "reorder_point": 23,
+    "lead_time_days": 3,
+    "avg_daily_usage": 5,
+    "unit_cost": 29800
+  },
+  {
+    "sku": "MK-1165",
+    "name": "Comino (bolsa 5 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 131,
+    "reorder_point": 65,
+    "lead_time_days": 14,
+    "avg_daily_usage": 4,
+    "unit_cost": 31200
+  },
+  {
+    "sku": "MK-1171",
+    "name": "Salsa de soya (tambor 20 L)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 176,
+    "reorder_point": 78,
+    "lead_time_days": 10,
+    "avg_daily_usage": 5,
+    "unit_cost": 34500
+  },
+  {
+    "sku": "MK-1181",
+    "name": "Base de salsa teriyaki (tambor 20 L)",
+    "warehouse": "CD Maipú",
+    "stock": 419,
+    "reorder_point": 214,
+    "lead_time_days": 10,
+    "avg_daily_usage": 15,
+    "unit_cost": 48000
+  },
+  {
+    "sku": "MK-1183",
+    "name": "Base de salsa de tomate (tambor 25 L)",
+    "warehouse": "CD Lampa",
+    "stock": 33,
+    "reorder_point": 23,
+    "lead_time_days": 6,
+    "avg_daily_usage": 3,
+    "unit_cost": 29500
+  },
+  {
+    "sku": "MK-1191",
+    "name": "Base de salsa BBQ (tambor 20 L)",
+    "warehouse": "Planta Quilicura",
+    "stock": 11,
+    "reorder_point": 68,
+    "lead_time_days": 4,
+    "avg_daily_usage": 15,
+    "unit_cost": 41000
+  },
+  {
+    "sku": "MK-1199",
+    "name": "Edamame congelado (bolsa 8 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 173,
+    "reorder_point": 87,
+    "lead_time_days": 14,
+    "avg_daily_usage": 5,
+    "unit_cost": 27900
+  },
+  {
+    "sku": "MK-1209",
+    "name": "Arroz de coliflor congelado (bolsa 10 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 124,
+    "reorder_point": 90,
+    "lead_time_days": 12,
+    "avg_daily_usage": 5,
+    "unit_cost": 23500
+  },
+  {
+    "sku": "MK-1211",
+    "name": "Camarones congelados (caja 5 kg)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 284,
+    "reorder_point": 84,
+    "lead_time_days": 8,
+    "avg_daily_usage": 8,
+    "unit_cost": 54000
+  },
+  {
+    "sku": "MK-1223",
+    "name": "Tofu en bloques (caja 24 un.)",
+    "warehouse": "Planta Quilicura",
+    "stock": 43,
+    "reorder_point": 35,
+    "lead_time_days": 3,
+    "avg_daily_usage": 8,
+    "unit_cost": 31000
+  },
+  {
+    "sku": "MK-1226",
+    "name": "Tempeh en bloques (caja 24 un.)",
+    "warehouse": "CD Lampa",
+    "stock": 104,
+    "reorder_point": 147,
+    "lead_time_days": 14,
+    "avg_daily_usage": 9,
+    "unit_cost": 42000
+  },
+  {
+    "sku": "MK-1232",
+    "name": "Claras de huevo líquidas (tambor 20 L)",
+    "warehouse": "Frigorífico San Bernardo",
+    "stock": 280,
+    "reorder_point": 47,
+    "lead_time_days": 14,
+    "avg_daily_usage": 3,
+    "unit_cost": 39500
+  },
+  {
+    "sku": "MK-1239",
+    "name": "Yogur griego (balde 20 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 37,
+    "reorder_point": 54,
+    "lead_time_days": 5,
+    "avg_daily_usage": 8,
+    "unit_cost": 46000
+  },
+  {
+    "sku": "MK-1246",
+    "name": "Queso cheddar rallado (bolsa 10 kg)",
+    "warehouse": "CD Lampa",
+    "stock": 27,
+    "reorder_point": 32,
+    "lead_time_days": 10,
+    "avg_daily_usage": 2,
+    "unit_cost": 72000
+  },
+  {
+    "sku": "MK-1256",
+    "name": "Queso mozzarella rallado (bolsa 10 kg)",
+    "warehouse": "CD Maipú",
+    "stock": 198,
+    "reorder_point": 143,
+    "lead_time_days": 10,
+    "avg_daily_usage": 10,
+    "unit_cost": 64000
+  },
+  {
+    "sku": "MK-1261",
+    "name": "Mantequilla sin sal (bloque 25 kg)",
+    "warehouse": "Planta Quilicura",
+    "stock": 13,
+    "reorder_point": 41,
+    "lead_time_days": 14,
+    "avg_daily_usage": 2,
+    "unit_cost": 168000
+  },
+  {
+    "sku": "MK-1271",
+    "name": "Bebida de almendra (caja 20 L)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 3,
+    "reorder_point": 16,
+    "lead_time_days": 5,
+    "avg_daily_usage": 2,
+    "unit_cost": 32000
+  },
+  {
+    "sku": "MK-1278",
+    "name": "Bebida de avena (caja 20 L)",
+    "warehouse": "Planta Quilicura",
+    "stock": 225,
+    "reorder_point": 56,
+    "lead_time_days": 6,
+    "avg_daily_usage": 8,
+    "unit_cost": 28500
+  },
+  {
+    "sku": "MK-1285",
+    "name": "Tortillas integrales (caja 200 un.)",
+    "warehouse": "Planta Quilicura",
+    "stock": 74,
+    "reorder_point": 46,
+    "lead_time_days": 4,
+    "avg_daily_usage": 8,
+    "unit_cost": 26500
+  },
+  {
+    "sku": "MK-1290",
+    "name": "Tortillas sin gluten (caja 150 un.)",
+    "warehouse": "CD Lampa",
+    "stock": 17,
+    "reorder_point": 49,
+    "lead_time_days": 8,
+    "avg_daily_usage": 5,
+    "unit_cost": 37800
+  },
+  {
+    "sku": "MK-1298",
+    "name": "Pan multigrano (caja 40 un.)",
+    "warehouse": "CD Maipú",
+    "stock": 71,
+    "reorder_point": 11,
+    "lead_time_days": 4,
+    "avg_daily_usage": 2,
+    "unit_cost": 44000
+  },
+  {
+    "sku": "MK-1302",
+    "name": "Semillas de chía (saco 10 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 452,
+    "reorder_point": 74,
+    "lead_time_days": 6,
+    "avg_daily_usage": 10,
+    "unit_cost": 39000
+  },
+  {
+    "sku": "MK-1310",
+    "name": "Semillas de linaza (saco 10 kg)",
+    "warehouse": "CD Maipú",
+    "stock": 58,
+    "reorder_point": 37,
+    "lead_time_days": 7,
+    "avg_daily_usage": 4,
+    "unit_cost": 18500
+  },
+  {
+    "sku": "MK-1321",
+    "name": "Avena laminada (saco 25 kg)",
+    "warehouse": "Bodega Pudahuel",
+    "stock": 54,
+    "reorder_point": 68,
+    "lead_time_days": 3,
+    "avg_daily_usage": 15,
+    "unit_cost": 27500
+  }
+]

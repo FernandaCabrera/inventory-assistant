@@ -19,7 +19,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
 } from "lucide-react";
-import sampleInventory from "./data/inventory.json";
+import { sampleInventory } from "./data/sample";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
 import {
   BarChart,
@@ -36,7 +36,7 @@ import {
 } from "recharts";
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
 import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
-import { STATUS_ORDER, statusFor, daysOfCover, tiedUpValue, summarize, toNumber } from "./inventoryLogic";
+import { STATUS_ORDER, statusFor, daysOfCover, summarize, toNumber } from "./inventoryLogic";
 import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
 import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
@@ -47,6 +47,8 @@ import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HowItWorks, Plans, AboutAndData, Footer, PrivacyModal } from "./HomeSections";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
+import { chartData } from "./reportLogic";
+import { useReportDownload, ReportCard, DashboardDownload } from "./ReportDownloads";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import CountImportModal from "./CountImportModal";
 import CycleCounts from "./CycleCounts";
@@ -186,24 +188,15 @@ function Dashboard({ items, lang, t, children }) {
     color: STATUS_STYLE[status].color,
   }));
 
-  const COVER_CHART_LIMIT = 10;
-  const allCoverData = items
-    .map((item) => ({ sku: item.sku, days: daysOfCover(item), color: STATUS_STYLE[statusFor(item)].color }))
-    .filter((d) => d.days !== null)
-    .map((d) => ({ ...d, days: Number(d.days.toFixed(1)) }))
-    .sort((a, b) => a.days - b.days);
-  const coverData = allCoverData.slice(0, COVER_CHART_LIMIT);
-  const hiddenCount = allCoverData.length - coverData.length;
+  // The same series go into the PowerPoint download, so the slides show what is on screen
+  const charts = useMemo(() => chartData(items, summary), [items, summary]);
+  const coverData = charts.cover.map((d) => ({ sku: d.item.sku, days: d.days, color: STATUS_STYLE[d.status].color }));
+  const hiddenCount = charts.coverTotal - coverData.length;
 
-  const warehouseData = Object.entries(summary.warehouses).map(([name, value]) => ({ name, value }));
+  const warehouseData = charts.warehouses.map((row) => ({ name: row.name, value: row.units }));
   const warehouseColors = [COLORS.ok, COLORS.low, COLORS.excess, COLORS.critical, COLORS.idle, COLORS.inkMuted];
 
-  const TIED_UP_LIMIT = 8;
-  const tiedUpData = items
-    .map((item) => ({ sku: item.sku, value: Math.round(tiedUpValue(item)), color: STATUS_STYLE[statusFor(item)].color }))
-    .filter((d) => d.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, TIED_UP_LIMIT);
+  const tiedUpData = charts.tiedUp.map((d) => ({ sku: d.item.sku, value: d.value, color: STATUS_STYLE[d.status].color }));
 
   const axisTick = { fontSize: 11, fill: COLORS.inkMuted };
   const skuTick = { fontSize: 11, fill: COLORS.ink, fontFamily: FONT_MONO };
@@ -266,7 +259,7 @@ function Dashboard({ items, lang, t, children }) {
         <ChartCard
           title={
             hiddenCount > 0
-              ? t("chartCoverTop", { n: COVER_CHART_LIMIT, total: formatNumber(lang, items.length) })
+              ? t("chartCoverTop", { n: coverData.length, total: formatNumber(lang, charts.coverTotal) })
               : t("chartCoverAll")
           }
           height={Math.max(220, coverData.length * 42)}
@@ -336,7 +329,7 @@ function LockedDashboard({ summary, lang, t, onUnlock }) {
         aria-hidden="true"
         style={{ filter: "blur(7px)", opacity: 0.55, pointerEvents: "none", userSelect: "none", maxHeight: 640, overflow: "hidden" }}
       >
-        <Dashboard items={sampleInventory} lang={lang} t={t} />
+        <Dashboard items={sampleInventory(lang)} lang={lang} t={t} />
       </div>
       <div
         style={{
@@ -447,7 +440,7 @@ function Message({ role, text, onExport, isExporting, isMobile, t }) {
               </>
             ) : (
               <>
-                <Download size={12} /> {t("exportReport")}
+                <Download size={12} /> {t("exportAnswer")}
               </>
             )}
           </button>
@@ -734,6 +727,19 @@ export default function InventoryAssistant() {
   const orderList = useMemo(() => buildOrderList(items, coverDays), [items, coverDays]);
   const runOut = useMemo(() => runningOutFirst(items, 3), [items]);
   const questionsLeft = paid ? Infinity : Math.max(0, FREE_QUESTIONS - questionsUsed);
+  // The executive report and the dashboard file. With the visitor's own file they are part of the plan.
+  const reportDownload = useReportDownload({
+    source: {
+      items,
+      coverDays,
+      importInfo: dataset && dataset.source === "upload" ? { ...dataset.report, maxRows: MAX_ROWS } : null,
+      sourceName: isSample ? t("sampleData") : dataset.fileName,
+    },
+    lang,
+    t,
+    locked: dashboardLocked,
+    onUnlock: () => setUpgradeReason("report"),
+  });
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -779,8 +785,9 @@ export default function InventoryAssistant() {
   function changeLang(next) {
     setLang(next);
     save("lang", next);
-    // the count example has product names and reasons in the language it was built in
+    // the examples have product names, warehouses and costs in the language they were built in
     if (counts && counts.source === "sample") setCounts(sampleCounts(next));
+    if (dataset && dataset.source === "sample") setDataset({ ...dataset, items: sampleInventory(next) });
   }
 
   function greetingText() {
@@ -810,7 +817,7 @@ export default function InventoryAssistant() {
   }
 
   function loadSampleData() {
-    setDataset({ items: sampleInventory, source: "sample", fileName: null, loadedAt: new Date().toISOString() });
+    setDataset({ items: sampleInventory(lang), source: "sample", fileName: null, loadedAt: new Date().toISOString() });
     resetConversation();
     setHasEntered(true);
   }
@@ -1509,6 +1516,7 @@ export default function InventoryAssistant() {
                   </button>
                 </div>
               )}
+              <DashboardDownload t={t} state={reportDownload} />
               <Dashboard items={items} lang={lang} t={t}>
                 <CountSnapshot
                   counts={counts}
@@ -1534,6 +1542,7 @@ export default function InventoryAssistant() {
             onOpenOrders={() => setView("orders")}
             onOpenDashboard={() => setView("dashboard")}
           />
+          <ReportCard t={t} state={reportDownload} locked={dashboardLocked} isSample={isSample} />
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 320px", gap: 20 }}>
             {/* Chat panel */}
             <div
