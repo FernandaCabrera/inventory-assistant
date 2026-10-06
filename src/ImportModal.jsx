@@ -74,7 +74,15 @@ export default function ImportModal({ lang, t, uploadsLeft = null, uploadsMax = 
       setError(t("errNoItems"));
       return;
     }
-    onImported({ items, fileName, report });
+    // what was assumed about this file goes with it: the report states it under "Assumptions and method"
+    const assumed = {
+      demandFrom: mapping.avg_daily_usage !== null ? "usage" : mapping.sales !== null ? "sales" : "minimum",
+      periodDays: Math.max(1, Number(period) || DEFAULT_SALES_PERIOD_DAYS),
+      reorderComputed: mapping.reorder_point === null,
+      defaultLeadUsed: mapping.lead_time_days === null,
+      defaultLead: Math.max(1, Number(lead) || DEFAULT_LEAD_TIME_DAYS),
+    };
+    onImported({ items, fileName, report: { ...report, ...assumed } });
   }
 
   return (

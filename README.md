@@ -14,17 +14,18 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **English and Spanish** — the interface follows the browser language and can be switched at any time; answers, reports and Excel exports come out in the same language.
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
-- **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000.
-- **Free tier and paid plan** — without a plan: three uploads, three questions, the first three rows of the order list, and the dashboard shown locked. The plan (USD 12 per month) unlocks the full order list with its Excel download, the dashboard, unlimited uploads and more questions. Visitors subscribe with PayPal's button in the plan window and the plan switches on by itself; while PayPal is not set up on the server they request the plan from the page and the request is emailed to the owner.
+- **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000. It downloads as a PowerPoint file: one slide per chart, each with what it shows and what to do, with charts and text that can be edited.
+- **Executive report** — a PDF ready to send (summary, key figures, recommendations, stock status, ABC, warehouses, urgent replenishment, excess and no sales, method) and two Excel files: the action plan and the analyzed inventory. Written by fixed rules, not AI. See [Executive report and dashboard download](#executive-report-and-dashboard-download).
+- **Free tier and paid plan** — without a plan: three uploads, three questions, the first three rows of the order list, and the dashboard shown locked. The plan (USD 12 per month) unlocks the full order list with its Excel download, the dashboard, the executive report and the dashboard in PowerPoint, unlimited uploads and more questions. With the sample data every download is open. Visitors subscribe with PayPal's button in the plan window and the plan switches on by itself; while PayPal is not set up on the server they request the plan from the page and the request is emailed to the owner.
 - **Usage limits** — daily caps per visitor, per access code and in total keep the AI bill bounded.
-- **Excel export** — every answer can be exported as a formatted workbook with a narrative report sheet and a color-coded action plan table.
+- **Export an answer** — every answer of the assistant can be exported as a formatted workbook with the answer, a color-coded action plan table and the inventory.
 - **Automated email alerts** — a scheduled job checks the sample dataset and emails a formatted alert whenever SKUs fall below their reorder point.
 - **Data protection by design** — only the fields the analysis needs are sent to the AI, and sensitive fields (customer names, emails, phone numbers, etc.) are filtered out regardless of what the dataset contains.
 - **Conversation memory** — follow-up questions ("what about that SKU in another warehouse?") work naturally within a session.
 
 ## Tech stack
 
-- **Frontend:** React, Recharts (dashboard), JSZip with a small values-only reader (spreadsheet import), ExcelJS (report export)
+- **Frontend:** React, Recharts (dashboard), JSZip with a small values-only reader (spreadsheet import), ExcelJS (Excel files), jsPDF with jspdf-autotable (PDF report), PptxGenJS (dashboard slides). The PDF and PowerPoint libraries are loaded only when their button is pressed.
 - **Backend:** Node.js, Express
 - **AI:** Anthropic Claude API (Sonnet), structured JSON output (narrative + action items + relevant charts)
 - **Email:** Resend, node-cron for scheduled checks
@@ -163,13 +164,32 @@ The second tool on the home page. It reads a spreadsheet of cycle counts and wri
 - **Privacy** — nothing in a count report leaves the browser, including the names of the people who counted, and it is kept only while the page is open. `src/App.test.js` checks that the example makes no network call and stores nothing.
 - **Example** — `src/data/sampleCounts.js` builds an invented report (products, locations, people and numbers are all made up) that goes through the same steps as an uploaded file.
 
+## Executive report and dashboard download
+
+Four files, all built in the browser from the loaded inventory. Nothing is sent to the server or to the AI to make them, and the same file always gives the same report.
+
+| File | Where | What is in it |
+|---|---|---|
+| Executive report, PDF (letter size) | Assistant tab → "Executive report" | Executive summary, key figures, recommendations with priority and timing, stock status with its reading, ABC classification, status by warehouse, urgent replenishment, transfers between warehouses, excess and no sales, notes on the data, assumptions and method |
+| Action plan, Excel | same | Summary and recommendations; what to order (priority, quantity, cost, what another warehouse can send); transfers; excess and no sales with the suggested action |
+| Analyzed inventory, Excel | same | Every product with status, ABC class, days of cover, value, quantity to order and capital tied up; ABC by class; warehouses; key figures and method |
+| Dashboard, PowerPoint | Dashboard tab → "Download in PowerPoint" | Cover, key figures, one slide per chart (status, warehouses, days of cover, capital tied up) with its reading and what to do, and a closing slide with the first actions |
+
+- **The figures** — `src/reportLogic.js`. Availability (products with sales that have stock), days of inventory and annual turnover (when the file has costs), median days of cover, capital tied up, the purchase needed and how much of it is urgent, ABC by consumption value (by units when the file has no costs), warehouse by warehouse, and transfers: stock that one warehouse can send to another that is about to buy the same product code.
+- **The words** — `src/reportText.js` turns the figures into sentences by fixed rules: the executive summary, the recommendations, how to read each chart, the method and the notes on the data. Sentences are written so they read correctly with any number ("Products to order: 1").
+- **The files** — `src/reportPdf.js`, `src/reportExcel.js`, `src/dashboardPptx.js`; `src/reportFiles.js` has what they share. The charts in the PowerPoint file are PowerPoint's own, so their data can be opened and changed. Excel cells hold numbers, with totals as formulas. The PDF uses the built-in fonts, so a symbol outside Western European letters is written with its closest plain character.
+- **What the file assumed** — the upload window passes on the sales period, whether the reorder point was calculated and whether a default lead time was used; the report states them under "Assumptions and method", and the rows left out under "Notes on the data".
+- **Days of cover** — the report uses the same number of days as the order list, so its quantities match that tab.
+- **Plan** — with the visitor's own file the four downloads need the plan; with the sample data they are open.
+- **Tests** — `src/reportLogic.test.js` (figures and text), `src/reportFiles.test.js` (builds each file and opens it again), `src/Reports.test.js` (the buttons). To keep the files and look at them: `REPORT_OUT=/tmp/reports npm test -- reportFiles`.
+
 ## Home page and privacy notice
 
 The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, accounts, analytics).
 
 ## Sample dataset
 
-`src/data/inventory.json` contains a sample food-manufacturing inventory across multiple warehouses. It powers "Try with sample data" in the app and the demo email alert.
+A sample food-manufacturing inventory across five warehouses, with unit costs. It powers "Try with sample data" and follows the language of the page: `src/data/inventory.json` in English (Canadian dollars; also used by the demo email alert) and `src/data/inventory.es.json` in Spanish (Chilean pesos). Both have the same 46 products and quantities; `src/reportLogic.test.js` checks that they stay in step.
 
 ## Screenshots
 

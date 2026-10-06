@@ -6,7 +6,8 @@
     "stock": 4,
     "reorder_point": 22,
     "lead_time_days": 3,
-    "avg_daily_usage": 6
+    "avg_daily_usage": 6,
+    "unit_cost": 31.29
   },
   {
     "sku": "FF-1013",
@@ -15,7 +16,8 @@
     "stock": 14,
     "reorder_point": 63,
     "lead_time_days": 4,
-    "avg_daily_usage": 12
+    "avg_daily_usage": 12,
+    "unit_cost": 88.57
   },
   {
     "sku": "FF-1019",
@@ -24,7 +26,8 @@
     "stock": 72,
     "reorder_point": 36,
     "lead_time_days": 3,
-    "avg_daily_usage": 10
+    "avg_daily_usage": 10,
+    "unit_cost": 55.0
   },
   {
     "sku": "FF-1023",
@@ -33,7 +36,8 @@
     "stock": 14,
     "reorder_point": 21,
     "lead_time_days": 7,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 24.14
   },
   {
     "sku": "FF-1031",
@@ -42,7 +46,8 @@
     "stock": 81,
     "reorder_point": 48,
     "lead_time_days": 6,
-    "avg_daily_usage": 7
+    "avg_daily_usage": 7,
+    "unit_cost": 21.71
   },
   {
     "sku": "FF-1038",
@@ -51,7 +56,8 @@
     "stock": 58,
     "reorder_point": 21,
     "lead_time_days": 7,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 21.14
   },
   {
     "sku": "FF-1046",
@@ -60,7 +66,8 @@
     "stock": 325,
     "reorder_point": 127,
     "lead_time_days": 14,
-    "avg_daily_usage": 6
+    "avg_daily_usage": 6,
+    "unit_cost": 350.0
   },
   {
     "sku": "FF-1054",
@@ -69,7 +76,8 @@
     "stock": 31,
     "reorder_point": 11,
     "lead_time_days": 4,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 282.86
   },
   {
     "sku": "FF-1058",
@@ -78,7 +86,8 @@
     "stock": 107,
     "reorder_point": 80,
     "lead_time_days": 10,
-    "avg_daily_usage": 6
+    "avg_daily_usage": 6,
+    "unit_cost": 188.57
   },
   {
     "sku": "FF-1066",
@@ -87,7 +96,8 @@
     "stock": 202,
     "reorder_point": 150,
     "lead_time_days": 7,
-    "avg_daily_usage": 15
+    "avg_daily_usage": 15,
+    "unit_cost": 122.86
   },
   {
     "sku": "FF-1076",
@@ -96,7 +106,8 @@
     "stock": 308,
     "reorder_point": 58,
     "lead_time_days": 5,
-    "avg_daily_usage": 9
+    "avg_daily_usage": 9,
+    "unit_cost": 177.14
   },
   {
     "sku": "FF-1082",
@@ -105,7 +116,8 @@
     "stock": 5,
     "reorder_point": 19,
     "lead_time_days": 8,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 46.43
   },
   {
     "sku": "FF-1087",
@@ -114,7 +126,8 @@
     "stock": 88,
     "reorder_point": 111,
     "lead_time_days": 6,
-    "avg_daily_usage": 12
+    "avg_daily_usage": 12,
+    "unit_cost": 97.14
   },
   {
     "sku": "FF-1095",
@@ -123,7 +136,8 @@
     "stock": 70,
     "reorder_point": 35,
     "lead_time_days": 5,
-    "avg_daily_usage": 6
+    "avg_daily_usage": 6,
+    "unit_cost": 39.29
   },
   {
     "sku": "FF-1104",
@@ -132,7 +146,8 @@
     "stock": 148,
     "reorder_point": 156,
     "lead_time_days": 10,
-    "avg_daily_usage": 12
+    "avg_daily_usage": 12,
+    "unit_cost": 35.57
   },
   {
     "sku": "FF-1110",
@@ -141,7 +156,8 @@
     "stock": 7,
     "reorder_point": 12,
     "lead_time_days": 4,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 55.71
   },
   {
     "sku": "FF-1118",
@@ -150,7 +166,8 @@
     "stock": 203,
     "reorder_point": 41,
     "lead_time_days": 4,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 40.71
   },
   {
     "sku": "FF-1124",
@@ -159,7 +176,8 @@
     "stock": 223,
     "reorder_point": 93,
     "lead_time_days": 4,
-    "avg_daily_usage": 15
+    "avg_daily_usage": 15,
+    "unit_cost": 47.14
   },
   {
     "sku": "FF-1129",
@@ -168,7 +186,8 @@
     "stock": 24,
     "reorder_point": 66,
     "lead_time_days": 7,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 82.86
   },
   {
     "sku": "FF-1139",
@@ -177,7 +196,8 @@
     "stock": 26,
     "reorder_point": 76,
     "lead_time_days": 14,
-    "avg_daily_usage": 4
+    "avg_daily_usage": 4,
+    "unit_cost": 11.29
   },
   {
     "sku": "FF-1146",
@@ -186,7 +206,8 @@
     "stock": 29,
     "reorder_point": 31,
     "lead_time_days": 6,
-    "avg_daily_usage": 4
+    "avg_daily_usage": 4,
+    "unit_cost": 62.86
   },
   {
     "sku": "FF-1152",
@@ -195,7 +216,8 @@
     "stock": 488,
     "reorder_point": 80,
     "lead_time_days": 8,
-    "avg_daily_usage": 9
+    "avg_daily_usage": 9,
+    "unit_cost": 52.14
   },
   {
     "sku": "FF-1157",
@@ -204,7 +226,8 @@
     "stock": 80,
     "reorder_point": 23,
     "lead_time_days": 3,
-    "avg_daily_usage": 5
+    "avg_daily_usage": 5,
+    "unit_cost": 42.57
   },
   {
     "sku": "FF-1165",
@@ -213,7 +236,8 @@
     "stock": 131,
     "reorder_point": 65,
     "lead_time_days": 14,
-    "avg_daily_usage": 4
+    "avg_daily_usage": 4,
+    "unit_cost": 44.57
   },
   {
     "sku": "FF-1171",
@@ -222,7 +246,8 @@
     "stock": 176,
     "reorder_point": 78,
     "lead_time_days": 10,
-    "avg_daily_usage": 5
+    "avg_daily_usage": 5,
+    "unit_cost": 49.29
   },
   {
     "sku": "FF-1181",
@@ -231,7 +256,8 @@
     "stock": 419,
     "reorder_point": 214,
     "lead_time_days": 10,
-    "avg_daily_usage": 15
+    "avg_daily_usage": 15,
+    "unit_cost": 68.57
   },
   {
     "sku": "FF-1183",
@@ -240,7 +266,8 @@
     "stock": 33,
     "reorder_point": 23,
     "lead_time_days": 6,
-    "avg_daily_usage": 3
+    "avg_daily_usage": 3,
+    "unit_cost": 42.14
   },
   {
     "sku": "FF-1191",
@@ -249,7 +276,8 @@
     "stock": 11,
     "reorder_point": 68,
     "lead_time_days": 4,
-    "avg_daily_usage": 15
+    "avg_daily_usage": 15,
+    "unit_cost": 58.57
   },
   {
     "sku": "FF-1199",
@@ -258,7 +286,8 @@
     "stock": 173,
     "reorder_point": 87,
     "lead_time_days": 14,
-    "avg_daily_usage": 5
+    "avg_daily_usage": 5,
+    "unit_cost": 39.86
   },
   {
     "sku": "FF-1209",
@@ -267,7 +296,8 @@
     "stock": 124,
     "reorder_point": 90,
     "lead_time_days": 12,
-    "avg_daily_usage": 5
+    "avg_daily_usage": 5,
+    "unit_cost": 33.57
   },
   {
     "sku": "FF-1211",
@@ -276,7 +306,8 @@
     "stock": 284,
     "reorder_point": 84,
     "lead_time_days": 8,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 77.14
   },
   {
     "sku": "FF-1223",
@@ -285,7 +316,8 @@
     "stock": 43,
     "reorder_point": 35,
     "lead_time_days": 3,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 44.29
   },
   {
     "sku": "FF-1226",
@@ -294,7 +326,8 @@
     "stock": 104,
     "reorder_point": 147,
     "lead_time_days": 14,
-    "avg_daily_usage": 9
+    "avg_daily_usage": 9,
+    "unit_cost": 60.0
   },
   {
     "sku": "FF-1232",
@@ -303,7 +336,8 @@
     "stock": 280,
     "reorder_point": 47,
     "lead_time_days": 14,
-    "avg_daily_usage": 3
+    "avg_daily_usage": 3,
+    "unit_cost": 56.43
   },
   {
     "sku": "FF-1239",
@@ -312,7 +346,8 @@
     "stock": 37,
     "reorder_point": 54,
     "lead_time_days": 5,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 65.71
   },
   {
     "sku": "FF-1246",
@@ -321,7 +356,8 @@
     "stock": 27,
     "reorder_point": 32,
     "lead_time_days": 10,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 102.86
   },
   {
     "sku": "FF-1256",
@@ -330,7 +366,8 @@
     "stock": 198,
     "reorder_point": 143,
     "lead_time_days": 10,
-    "avg_daily_usage": 10
+    "avg_daily_usage": 10,
+    "unit_cost": 91.43
   },
   {
     "sku": "FF-1261",
@@ -339,7 +376,8 @@
     "stock": 13,
     "reorder_point": 41,
     "lead_time_days": 14,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 240.0
   },
   {
     "sku": "FF-1271",
@@ -348,7 +386,8 @@
     "stock": 3,
     "reorder_point": 16,
     "lead_time_days": 5,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 45.71
   },
   {
     "sku": "FF-1278",
@@ -357,7 +396,8 @@
     "stock": 225,
     "reorder_point": 56,
     "lead_time_days": 6,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 40.71
   },
   {
     "sku": "FF-1285",
@@ -366,7 +406,8 @@
     "stock": 74,
     "reorder_point": 46,
     "lead_time_days": 4,
-    "avg_daily_usage": 8
+    "avg_daily_usage": 8,
+    "unit_cost": 37.86
   },
   {
     "sku": "FF-1290",
@@ -375,7 +416,8 @@
     "stock": 17,
     "reorder_point": 49,
     "lead_time_days": 8,
-    "avg_daily_usage": 5
+    "avg_daily_usage": 5,
+    "unit_cost": 54.0
   },
   {
     "sku": "FF-1298",
@@ -384,7 +426,8 @@
     "stock": 71,
     "reorder_point": 11,
     "lead_time_days": 4,
-    "avg_daily_usage": 2
+    "avg_daily_usage": 2,
+    "unit_cost": 62.86
   },
   {
     "sku": "FF-1302",
@@ -393,7 +436,8 @@
     "stock": 452,
     "reorder_point": 74,
     "lead_time_days": 6,
-    "avg_daily_usage": 10
+    "avg_daily_usage": 10,
+    "unit_cost": 55.71
   },
   {
     "sku": "FF-1310",
@@ -402,7 +446,8 @@
     "stock": 58,
     "reorder_point": 37,
     "lead_time_days": 7,
-    "avg_daily_usage": 4
+    "avg_daily_usage": 4,
+    "unit_cost": 26.43
   },
   {
     "sku": "FF-1321",
@@ -411,6 +456,7 @@
     "stock": 54,
     "reorder_point": 68,
     "lead_time_days": 3,
-    "avg_daily_usage": 15
+    "avg_daily_usage": 15,
+    "unit_cost": 39.29
   }
 ]
