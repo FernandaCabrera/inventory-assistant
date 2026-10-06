@@ -1,19 +1,40 @@
-import { useState } from "react";
-import { ArrowRight, Check, KeyRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, KeyRound, Loader2 } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
 import { FREE_UPLOADS, FREE_QUESTIONS, CONTACT_EMAIL, PLAN_PRICE } from "./config";
 import { countText } from "./i18n";
-import { paymentLink } from "./plan";
+import PayPalButton from "./PayPalButton";
+import { paypalConfigured } from "./plan";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClose, onActivated }) {
+export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onSubscribed, onClose, onActivated }) {
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
   const [requestState, setRequestState] = useState("idle"); // idle | sending | sent | error | invalid
   const [code, setCode] = useState("");
   const [codeState, setCodeState] = useState("idle"); // idle | checking | invalid | error | active
+  // Can PayPal be used? "checking" until the server says whether it can confirm payments, then
+  // "on" or "off". The button is only offered when it can, so nobody pays for a plan that
+  // cannot be switched on.
+  const [payments, setPayments] = useState(() => (paypalConfigured() ? "checking" : "off"));
+
+  useEffect(() => {
+    if (!paypalConfigured()) return undefined;
+    let cancelled = false;
+    fetch(`${apiUrl}/api/health`)
+      .then((res) => (res && res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setPayments(data && data.paypal === true ? "on" : "off");
+      })
+      .catch(() => {
+        if (!cancelled) setPayments("off");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl]);
 
   const reasonText =
     reason === "upload"
@@ -28,8 +49,6 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
       ? t("planReasonCounts")
       : "";
   const price = PLAN_PRICE[lang] || "";
-  // With a Stripe link set, people pay straight away; without one, they ask for the plan by email.
-  const payUrl = paymentLink(lang);
 
   async function sendRequest(e) {
     e.preventDefault();
@@ -116,15 +135,18 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
         </div>
       ) : (
         <>
-          {payUrl ? (
-            <>
-              <a href={payUrl} data-testid="plan-pay" style={{ ...primaryButton, textDecoration: "none" }}>
-                {t("paySubscribe")} <ArrowRight size={15} />
-              </a>
+          {/* With PayPal ready, people subscribe straight away; without it, they ask for the plan by email. */}
+          {payments === "on" ? (
+            <div data-testid="plan-pay">
+              <PayPalButton t={t} onSubscribed={onSubscribed} />
               <p style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.55, margin: "10px 0 0" }}>
                 {t("payNote")} {t("payQuestions", { contact: CONTACT_EMAIL })}
               </p>
-            </>
+            </div>
+          ) : payments === "checking" ? (
+            <div role="status" style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14, lineHeight: 1.5, color: COLORS.inkMuted }}>
+              <Loader2 size={15} className="ia-spin" style={{ flexShrink: 0, marginTop: 3 }} /> {t("payPreparing")}
+            </div>
           ) : (
             <>
           <div style={sectionTitle}>{t("planRequestTitle")}</div>
@@ -202,7 +224,7 @@ export default function UpgradeModal({ t, lang, reason, apiUrl, skuCount, onClos
               placeholder={t("planCodePlaceholder")}
               aria-label={t("planCodePlaceholder")}
               autoComplete="off"
-              style={{ ...textInput, flex: "1 1 180px", width: "auto", textTransform: code.trim().startsWith("sub_") ? "none" : "uppercase" }}
+              style={{ ...textInput, flex: "1 1 180px", width: "auto", textTransform: "uppercase" }}
             />
             <button
               type="submit"

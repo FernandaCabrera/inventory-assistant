@@ -15,7 +15,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **Conversational analysis** — ask about stockouts, excess inventory, slow-moving SKUs, or what to order this week. Claude calculates days of cover, reorder math, and priority — not just describes the data.
 - **Full status report** — generates the standard multi-section report used in weekly operations reviews (Executive Summary, Stock Status, Reorder Actions, Excess & Slow-Moving Inventory, Recommendations).
 - **Interactive dashboard** — KPI cards and charts (status breakdown, days of cover, warehouse distribution, capital tied up) that scale cleanly whether the dataset has 6 SKUs or 5,000.
-- **Free tier and paid plan** — without a plan: three uploads, three questions, the first three rows of the order list, and the dashboard shown locked. The plan (USD 12 per month) unlocks the full order list with its Excel download, the dashboard, unlimited uploads and more questions. Visitors subscribe on a Stripe payment link and the plan switches on by itself when they come back; while no Stripe link is set they request the plan from the page and the request is emailed to the owner.
+- **Free tier and paid plan** — without a plan: three uploads, three questions, the first three rows of the order list, and the dashboard shown locked. The plan (USD 12 per month) unlocks the full order list with its Excel download, the dashboard, unlimited uploads and more questions. Visitors subscribe with PayPal's button in the plan window and the plan switches on by itself; while PayPal is not set up on the server they request the plan from the page and the request is emailed to the owner.
 - **Usage limits** — daily caps per visitor, per access code and in total keep the AI bill bounded.
 - **Excel export** — every answer can be exported as a formatted workbook with a narrative report sheet and a color-coded action plan table.
 - **Automated email alerts** — a scheduled job checks the sample dataset and emails a formatted alert whenever SKUs fall below their reorder point.
@@ -61,7 +61,9 @@ ANTHROPIC_API_KEY=your_key_here
 RESEND_API_KEY=your_key_here
 ACCESS_CODES=CAFE-2291,TIENDA-8840
 LEADS_RECIPIENT=you@example.com
-STRIPE_SECRET_KEY=rk_live_your_restricted_key
+PAYPAL_CLIENT_ID=your_app_client_id
+PAYPAL_CLIENT_SECRET=your_app_secret
+PAYPAL_PLAN_ID=P-your_plan_id
 ```
 
 **3. Run the backend**
@@ -83,7 +85,7 @@ The app opens at `http://localhost:3000`.
 
 ```bash
 npm test                 # the page
-cd server && npm test    # the Stripe logic on the server
+cd server && npm test    # the PayPal logic on the server
 ```
 
 ## Plans, codes and limits
@@ -97,11 +99,12 @@ cd server && npm test    # the Stripe logic on the server
 | Count report: Excel download needs the plan | `src/config.js` → `COUNT_EXPORT_NEEDS_PLAN` | true |
 | Count report: default cycle, in days | `src/config.js` → `DEFAULT_CYCLE_DAYS` (visitors can change it) | 90 |
 | Count report: lines read from a file | `src/config.js` → `COUNT_MAX_LINES` | 50,000 |
-| Price shown in the plan window, per language (the amount charged is the one set in Stripe) | `src/config.js` → `PLAN_PRICE` | USD 12 per month |
-| Stripe payment link behind the "Subscribe" button | `src/config.js` → `STRIPE_PAYMENT_LINK` | none (the request form is shown) |
-| Stripe customer portal link, to change card or cancel | `src/config.js` → `STRIPE_PORTAL_LINK` | none |
-| Stripe key the server uses to check subscriptions | server env `STRIPE_SECRET_KEY` | none (Stripe off) |
-| Only this Stripe price unlocks the plan | server env `STRIPE_PRICE_ID` | any subscription on the account |
+| Price shown in the plan window, per language (the amount charged is the one set in the PayPal plan) | `src/config.js` → `PLAN_PRICE` | USD 12 per month |
+| PayPal plan behind the subscribe button, and the client id that draws it | `src/config.js` → `PAYPAL_PLAN_ID`, `PAYPAL_CLIENT_ID` | the monthly plan |
+| Where customers see or cancel their PayPal payments | `src/config.js` → `PAYPAL_MANAGE_LINK` | PayPal's automatic payments page |
+| PayPal app the server uses to check subscriptions | server env `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | none (PayPal off, no pay button) |
+| Only this PayPal plan unlocks the plan | server env `PAYPAL_PLAN_ID` | any subscription on the account |
+| Test against PayPal's sandbox | server env `PAYPAL_ENV=sandbox` | live |
 | Name and LinkedIn shown under "Who is behind it" | `src/config.js` → `OWNER_NAME`, `OWNER_LINKEDIN` | — |
 | Access codes for the paid plan | server env `ACCESS_CODES` (comma-separated) | none |
 | Questions per day without a code, per network address | server env `FREE_DAILY_QUESTIONS_PER_IP` | 10 |
@@ -117,29 +120,32 @@ What these limits are and are not:
 
 - The free limits (three uploads, three questions) and the dashboard lock are kept in the visitor's browser. They are a sales gate, not a security boundary: clearing browser data resets them. The server-side daily caps are what bound cost.
 - Daily counters are held in memory, so they reset at 00:00 UTC and whenever the server restarts.
-- There are no accounts and nothing about customers is stored on the server: Stripe is the record of who has paid.
+- There are no accounts and nothing about customers is stored on the server: PayPal is the record of who has paid.
 - Also set a monthly spend limit in the Anthropic Console as a last line of defense.
 
-## Subscriptions with Stripe
+## Subscriptions with PayPal
 
-Visitors pay on a Stripe Payment Link. Stripe sends them back to the site, the page asks the server to confirm the payment, and the plan switches on. From then on the server asks Stripe whether the subscription is still active, so a cancelled or unpaid subscription switches the plan off by itself.
+Visitors subscribe with PayPal's button in the plan window, with a PayPal account or with a card. PayPal gives the page the id of the subscription, the page asks the server to confirm it, and the plan switches on. From then on the server asks PayPal whether the subscription is still active, so a cancelled subscription or a failed payment switches the plan off by itself.
 
 **Set it up once**
 
-1. In Stripe, create a product with a recurring price of USD 12 per month, and a Payment Link for it.
-2. In the Payment Link, under "After payment", choose "Don't show confirmation page" and send people to `https://mikardex.cl/?session_id={CHECKOUT_SESSION_ID}` (the address where the tool opens, then `?session_id={CHECKOUT_SESSION_ID}` exactly as written).
-3. Paste the link in `src/config.js` → `STRIPE_PAYMENT_LINK` and publish the page.
-4. In Stripe, create a restricted key (Developers → API keys → Create restricted key) with only "Checkout Sessions: Read" and "Subscriptions: Read". Add it on the server host as `STRIPE_SECRET_KEY` and restart the server. The log then says `Stripe: on.`
-5. Optional: switch on Stripe's customer portal and paste its link in `STRIPE_PORTAL_LINK`, so customers can change their card or cancel on their own.
+1. In PayPal (a business account), create the plan at `paypal.com/billing/plans`: fixed pricing, USD 12 every 1 month, unlimited cycles. Turn it on.
+2. Put the plan id (`P-...`) and the client id from the button code PayPal shows in `src/config.js` → `PAYPAL_PLAN_ID` and `PAYPAL_CLIENT_ID`. Neither is secret.
+3. In `developer.paypal.com` → Apps & Credentials → Live, create an app. Add its Client ID and Secret on the server host as `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`, add `PAYPAL_PLAN_ID` with the plan id, and restart the server. The log then says `PayPal: on (live)`.
 
-Try it in Stripe's test mode first: a test Payment Link, a test key (`rk_test_...`) and the card `4242 4242 4242 4242`.
+The pay button only appears once step 3 is done: the page asks the server whether it can confirm payments, and until it can the plan window keeps the "request the plan" form. So the page can be published before the server is ready, and nobody can pay for a plan that cannot be switched on.
+
+To try it without real money, create a sandbox app and a sandbox plan (`sandbox.paypal.com/billing/plans`), use their ids in `src/config.js` and on the server, and set `PAYPAL_ENV=sandbox`.
 
 **How a customer keeps their plan**
 
-- The access code is the Stripe subscription id (`sub_...`). It is saved in the browser where they paid and shown to them in "Plan active", to enter on another computer under "Already have a code?".
-- If a customer loses the code, or paid but was not brought back to the site, open the customer in the Stripe dashboard, copy the subscription id and send it to them. It works as their code.
-- The server asks Stripe about an active code again after 10 minutes, so a cancellation takes effect within that time. If Stripe cannot be reached, customers already seen as active keep the plan for up to a day.
-- The logic is in `server/stripe.js` (server), `src/plan.js` and `src/PlanModal.jsx` (page).
+- The access code is the PayPal subscription id (`I-...`). It is saved in the browser where they subscribed and shown to them in "Plan active", to enter on another computer under "Already have a code?". PayPal also emails it to them.
+- If a customer loses the code, open the subscription in the PayPal account, copy its id and send it to them. It works as their code.
+- If the server could not confirm a subscription (it was asleep, or the tab was closed), the id is kept in the customer's browser and confirmed the next time they open the page.
+- A customer who cancels keeps the plan for the month already paid: until 31 days after their last payment. A failed payment switches the plan off (the PayPal plan pauses after 1 missed cycle).
+- The server asks PayPal about an active code again after 10 minutes. If PayPal cannot be reached, customers already seen as active keep the plan for up to a day.
+- Customers with a PayPal account cancel from PayPal's automatic payments page (linked in "Plan active"). Customers who paid by card without an account write in, and the subscription is cancelled from the PayPal account.
+- The logic is in `server/paypal.js` (server), `src/plan.js`, `src/PayPalButton.jsx` and `src/PlanModal.jsx` (page).
 
 ## Cycle count report
 

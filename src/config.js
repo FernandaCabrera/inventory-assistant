@@ -39,19 +39,19 @@ export const DEFAULT_CYCLE_DAYS = 90; // every location should be counted at lea
 export const COUNT_EXPORT_NEEDS_PLAN = true;
 
 // Price shown in the plan window, per language. Leave empty to show no price.
-// This is only the text on the page: the amount that is charged is the one set in Stripe.
+// This is only the text on the page: the amount that is charged is the one set in the PayPal plan.
 export const PLAN_PRICE = { es: "USD 12 al mes", en: "USD 12 per month" };
 
-// Stripe. Paste the Payment Link of the monthly plan (it looks like https://buy.stripe.com/...).
-// While it is empty the plan window shows the "request the plan" form instead of a pay button.
-// In Stripe, set the link to send people back to the site after paying, to this address:
-//   https://mikardex.cl/?session_id={CHECKOUT_SESSION_ID}
-// The server also needs STRIPE_SECRET_KEY (see server/.env.example).
-export const STRIPE_PAYMENT_LINK = "";
+// PayPal. The plan window shows PayPal's subscribe button for this plan. Both values come from
+// the button code PayPal gives after creating the plan (paypal.com/billing/plans); neither is secret.
+// The button only appears once the server has PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET
+// (see server/.env.example): until then the plan window keeps the "request the plan" form.
+// Leave either one empty to switch the button off.
+export const PAYPAL_CLIENT_ID = "BAAOtZP8GN_EhgfPGYtQ8k3LQrleJntydz3DJMK5Y0pOpfR7cf-B50O7X5-cNH4mmChFwr2wAbeVS0yUFg";
+export const PAYPAL_PLAN_ID = "P-5LR918731A854994WNLCDVUY"; // Plan mensual / Monthly plan, USD 12
 
-// Optional: the link of Stripe's customer portal (https://billing.stripe.com/p/login/...), where a
-// customer changes their card or cancels. Shown to customers with an active plan.
-export const STRIPE_PORTAL_LINK = "";
+// Where a customer with a PayPal account sees and cancels their automatic payments
+export const PAYPAL_MANAGE_LINK = "https://www.paypal.com/myaccount/autopay/";
 
 // Who is behind the tool (shown on the home page)
 export const OWNER_NAME = "Fernanda Cabrera";
