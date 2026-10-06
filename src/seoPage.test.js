@@ -67,7 +67,8 @@ test("the address decides the page", () => {
 test("each page has its own title and description, short enough for a search result", () => {
   for (const lang of LANGS) {
     expect(translator(lang)("seoTitle")).toMatch(/^MiKardex · /);
-    expect(translator(lang)("seoTitle").length).toBeLessThanOrEqual(90);
+    // Google shows about 60 characters of a title: a longer one loses its second half
+    expect(translator(lang)("seoTitle").length).toBeLessThanOrEqual(65);
   }
   for (const id of LANDING_IDS) {
     for (const lang of Object.keys(PAGES[id])) {

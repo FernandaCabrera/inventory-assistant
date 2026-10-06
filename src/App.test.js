@@ -416,7 +416,7 @@ test("mikardex.cl/ is in Spanish for a new visitor, also with a browser in Engli
   expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pregúntale a tu inventario");
   expect(document.documentElement.lang).toBe("es");
-  expect(document.title).toMatch(/^MiKardex · Analiza tu inventario desde Excel/);
+  expect(document.title).toBe("MiKardex · Inventario en Excel: qué reponer y qué no se vende");
   expect(window.location.pathname).toBe("/");
   expect(screen.getByRole("link", { name: "ES" })).toHaveAttribute("aria-current", "true");
   expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/");
@@ -435,7 +435,7 @@ test("the language switch moves the address with it and is remembered", () => {
   render(<App />); // starts at /en/
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
   expect(document.documentElement.lang).toBe("en");
-  expect(document.title).toMatch(/^MiKardex · Inventory analysis from your Excel/);
+  expect(document.title).toBe("MiKardex · Excel inventory: what to reorder, what is not selling");
   expect(screen.queryByTestId("other-language")).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("link", { name: "ES" }));
