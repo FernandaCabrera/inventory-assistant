@@ -603,3 +603,49 @@ test("the Excel automation page says what the service is and its button writes a
   expect(screen.getByTestId("service-mail")).toHaveAttribute("href", "mailto:hola@mikardex.cl?subject=Excel%20automation");
   expect(document.body.textContent).not.toMatch(/\{\w+\}/);
 });
+
+test("the reorder point guide shows its table and formulas and offers the tool", () => {
+  window.history.replaceState(null, "", "/punto-de-reorden-excel/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Cómo calcular el punto de reorden en Excel");
+  expect(document.title).toBe("Punto de reorden en Excel: fórmula y ejemplo paso a paso · MiKardex");
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+  expect(screen.getByRole("table")).toBeInTheDocument();
+  expect(screen.getByText("Días de reposición", { selector: "td" })).toBeInTheDocument();
+  expect(screen.getByText("=REDONDEAR.MAS(E2*D2*1,5;0)")).toBeInTheDocument();
+  expect(screen.getByText('=SI(B2<F2;"Pedir";"OK")')).toBeInTheDocument();
+  // the tool is offered with the same buttons as the home page
+  expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Probar con datos de ejemplo/ })).toBeInTheDocument();
+  // and the guide leads on to the pages that continue it
+  expect(screen.getAllByRole("link", { name: /Análisis de inventario en Excel/ })[0]).toHaveAttribute("href", "/analisis-inventario-excel/");
+  expect(screen.getAllByRole("link", { name: /Kardex en Excel/ })[0]).toHaveAttribute("href", "/kardex-excel/");
+});
+
+test("the kardex guide offers the template first and the tool at the end", () => {
+  window.history.replaceState(null, "", "/kardex-excel/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Kardex en Excel: plantilla gratis y cómo llevarlo");
+  expect(document.title).toBe("Kardex en Excel: plantilla gratis con fórmulas · MiKardex");
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+
+  const download = screen.getByTestId("landing-download");
+  expect(download).toHaveTextContent("Descargar la plantilla (Excel)");
+  expect(download).toHaveAttribute("href", "/plantillas/plantilla-kardex-mikardex.xlsx");
+  expect(download).toHaveAttribute("download");
+  expect(screen.getAllByRole("table")).toHaveLength(2);
+  expect(screen.getByText("=SI(J8=0;0;L8/J8)")).toBeInTheDocument();
+
+  // the tool comes at the end, after the guide has said what a kardex does not answer
+  const buttons = screen.getAllByRole("button", { name: /Sube tu Excel|Probar con datos de ejemplo/ });
+  expect(buttons).toHaveLength(2);
+  expect(download.compareDocumentPosition(buttons[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: /Informe de conteo cíclico/ })[0]).toHaveAttribute("href", "/conteo-ciclico-sap/");
+});
+
+test("the analysis page leads on to the two guides", () => {
+  window.history.replaceState(null, "", "/analisis-inventario-excel/");
+  render(<App />);
+  expect(screen.getAllByRole("link", { name: /Punto de reorden en Excel/ })[0]).toHaveAttribute("href", "/punto-de-reorden-excel/");
+  expect(screen.getAllByRole("link", { name: /Kardex en Excel/ })[0]).toHaveAttribute("href", "/kardex-excel/");
+});

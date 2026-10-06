@@ -5,10 +5,11 @@
 // language switch and the footer are handed in by src/InventoryAssistant.jsx, so they behave
 // exactly as on the home page.
 
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, ArrowRight, Download } from "lucide-react";
 import { COLORS, FONT_MONO, FONT_HEAD, FONT_BODY, monoLabel } from "./theme";
 import { LANG_PATHS, fill, countText, formatNumber } from "./i18n";
 import { landingText } from "./landingText";
+import { PAGES } from "./pages";
 import { ABC_A_SHARE, ABC_B_SHARE } from "./reportLogic";
 import {
   PLAN_PRICE,
@@ -42,6 +43,8 @@ export function landingVars(lang, t) {
     abcB: formatNumber(lang, ABC_B_SHARE * 100),
     maxRows: formatNumber(lang, MAX_ROWS),
     maxLines: formatNumber(lang, COUNT_MAX_LINES),
+    // the safety factor as Excel in English writes it, with a decimal point
+    factorPlain: String(SAFETY_FACTOR),
     email: CONTACT_EMAIL,
     name: OWNER_NAME,
   };
@@ -73,9 +76,122 @@ function Point({ children }) {
   );
 }
 
-// One piece of a section: a paragraph, a list of points or a numbered list
-function Block({ item, vars }) {
+const cell = { border: `1px solid ${COLORS.line}`, padding: "7px 10px", textAlign: "left", verticalAlign: "top" };
+
+// A small table, such as the columns of an example. On a phone it scrolls sideways inside its box.
+function Table({ table, vars }) {
+  return (
+    <div style={{ overflowX: "auto", margin: "0 0 14px", maxWidth: 860 }}>
+      <table style={{ borderCollapse: "collapse", fontSize: 14, lineHeight: 1.45, color: COLORS.ink, minWidth: table.head.length > 4 ? 620 : 0 }}>
+        <thead>
+          <tr>
+            {table.head.map((label, i) => (
+              <th key={i} style={{ ...cell, background: COLORS.surfaceAlt, fontWeight: 600, whiteSpace: "nowrap" }}>
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, i) => (
+            <tr key={i}>
+              {row.map((value, j) => (
+                <td key={j} style={cell}>
+                  {fill(value, vars)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Excel formulas, each with the cell it goes in and what it gives, written so they can be copied
+function Formulas({ formulas, vars }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "0 0 14px", maxWidth: 760 }}>
+      {formulas.map((entry) => (
+        <div key={entry.cell} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+          <span style={{ fontSize: 14, color: COLORS.inkMuted, minWidth: 190 }}>
+            <strong style={{ fontWeight: 600, color: COLORS.ink }}>{entry.cell}</strong> · {entry.what}
+          </span>
+          <code
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 13.5,
+              background: COLORS.surfaceAlt,
+              border: `1px solid ${COLORS.line}`,
+              borderRadius: 6,
+              padding: "4px 9px",
+              color: COLORS.ink,
+              userSelect: "all",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {fill(entry.formula, vars)}
+          </code>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// A file to download, such as a template
+export function DownloadButton({ file }) {
+  return (
+    <>
+      <a
+        href={file.href}
+        download
+        data-testid="landing-download"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: FONT_MONO,
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          padding: "14px 24px",
+          borderRadius: 8,
+          border: `1px solid ${COLORS.ink}`,
+          background: COLORS.ink,
+          color: "#F4F1EA",
+          textDecoration: "none",
+        }}
+      >
+        <Download size={15} /> {file.label}
+      </a>
+      <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "14px 0 0" }}>{file.note}</p>
+    </>
+  );
+}
+
+// Links to other pages of the site that continue what a section says
+function SeeAlso({ ids, lang }) {
+  const links = ids.filter((id) => PAGES[id] && PAGES[id][lang]);
+  if (links.length === 0) return null;
+  return (
+    <p style={{ ...text, display: "flex", gap: 18, flexWrap: "wrap" }}>
+      {links.map((id) => (
+        <a key={id} href={PAGES[id][lang]} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 600, color: COLORS.ink, textUnderlineOffset: 3 }}>
+          {landingText(id, lang).navLabel} <ArrowRight size={14} />
+        </a>
+      ))}
+    </p>
+  );
+}
+
+// One piece of a section: a paragraph, a list of points, a numbered list, a table, Excel
+// formulas or links to other pages
+function Block({ item, vars, lang }) {
   if (typeof item === "string") return <p style={text}>{fill(item, vars)}</p>;
+  if (item.table) return <Table table={item.table} vars={vars} />;
+  if (item.formulas) return <Formulas formulas={item.formulas} vars={vars} />;
+  if (item.see) return <SeeAlso ids={item.see} lang={lang} />;
   if (Array.isArray(item)) {
     return (
       <ul style={list}>
@@ -152,7 +268,7 @@ export default function LandingPage({ id, lang, t, toggle, actions, note, closin
           <section key={section.h} style={box}>
             <h2 style={h2}>{section.h}</h2>
             {section.body.map((item, i) => (
-              <Block key={i} item={item} vars={vars} />
+              <Block key={i} item={item} vars={vars} lang={lang} />
             ))}
           </section>
         ))}
