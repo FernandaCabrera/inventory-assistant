@@ -1,43 +1,42 @@
-// The paid plan, on the browser side: access codes and the trip to Stripe and back.
+// The paid plan, on the browser side: access codes and PayPal's subscribe button.
 
-import { STRIPE_PAYMENT_LINK } from "./config";
+import { PAYPAL_CLIENT_ID, PAYPAL_PLAN_ID } from "./config";
 
-// Whoever pays on Stripe gets their subscription id (sub_...) as their access code.
-// These ids are case-sensitive; the codes handed out by hand are not.
-export function isStripeCode(code) {
-  return /^sub_[A-Za-z0-9]{8,200}$/.test(String(code || ""));
+// Whoever subscribes with PayPal gets their subscription id (I-...) as their access code.
+export function isPaypalCode(code) {
+  return /^I-[A-Z0-9]{8,40}$/.test(String(code || ""));
 }
 
+// Codes are not case-sensitive: they are kept and sent in capitals.
 export function cleanCode(code) {
-  const clean = String(code || "").trim();
-  return isStripeCode(clean) ? clean : clean.toUpperCase();
+  return String(code || "").trim().toUpperCase();
 }
 
-// Where the "Subscribe" button goes: the Stripe link, opened in the visitor's language.
-// Empty when no link is set in config.js.
-export function paymentLink(lang) {
-  const link = String(STRIPE_PAYMENT_LINK || "").trim();
-  if (!link) return "";
-  return `${link}${link.includes("?") ? "&" : "?"}locale=${lang === "es" ? "es" : "en"}`;
+// true when config.js has what the PayPal button needs
+export function paypalConfigured() {
+  return Boolean(String(PAYPAL_CLIENT_ID || "").trim() && String(PAYPAL_PLAN_ID || "").trim());
 }
 
-// After paying, Stripe sends the visitor back to the site with ?session_id=cs_... in the address.
-export function returnedSessionId() {
-  try {
-    const id = new URLSearchParams(window.location.search).get("session_id") || "";
-    return /^cs_(test|live)_[A-Za-z0-9]{8,200}$/.test(id) ? id : "";
-  } catch (err) {
-    return "";
+// Loads PayPal's script once, the first time the plan window needs it. Nothing from PayPal is
+// loaded for visitors who never open the plan window.
+let loading = null;
+export function loadPayPal() {
+  if (window.paypal && typeof window.paypal.Buttons === "function") return Promise.resolve(window.paypal);
+  if (!loading) {
+    loading = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&vault=true&intent=subscription`;
+      script.async = true;
+      script.onload = () => {
+        if (window.paypal && typeof window.paypal.Buttons === "function") resolve(window.paypal);
+        else reject(new Error("PayPal did not load"));
+      };
+      script.onerror = () => reject(new Error("PayPal did not load"));
+      document.head.appendChild(script);
+    }).catch((err) => {
+      loading = null; // a later try starts again
+      throw err;
+    });
   }
-}
-
-// Takes the session id out of the address, so a reload or a shared link does not carry it.
-export function clearReturnedSession() {
-  try {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("session_id");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  } catch (err) {
-    // nothing to do
-  }
+  return loading;
 }

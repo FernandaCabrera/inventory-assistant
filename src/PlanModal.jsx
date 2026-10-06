@@ -1,10 +1,10 @@
 import { ExternalLink, Loader2 } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, FONT_MONO, monoLabel, primaryButton, textInput } from "./theme";
-import { CONTACT_EMAIL, STRIPE_PORTAL_LINK } from "./config";
-import { isStripeCode } from "./plan";
+import { CONTACT_EMAIL, PAYPAL_MANAGE_LINK } from "./config";
+import { isPaypalCode } from "./plan";
 
-// The customer's own plan. It opens by itself when they come back from paying on Stripe, and
+// The customer's own plan. It opens by itself when they have just subscribed with PayPal, and
 // afterwards from the "Plan active" chip.
 // status: "checking" (asking the server), "active", "failed" (the payment could not be confirmed)
 // or "error" (the server could not be reached; they can try again).
@@ -62,25 +62,28 @@ export default function PlanModal({ t, status, code, onRetry, onClose }) {
             </>
           )}
 
-          {STRIPE_PORTAL_LINK && isStripeCode(code) && (
-            <a
-              href={STRIPE_PORTAL_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 16,
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: COLORS.ink,
-                textDecoration: "underline",
-                textUnderlineOffset: 3,
-              }}
-            >
-              <ExternalLink size={14} /> {t("planManage")}
-            </a>
+          {PAYPAL_MANAGE_LINK && isPaypalCode(code) && (
+            <>
+              <a
+                href={PAYPAL_MANAGE_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 16,
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: COLORS.ink,
+                  textDecoration: "underline",
+                  textUnderlineOffset: 3,
+                }}
+              >
+                <ExternalLink size={14} /> {t("planManage")}
+              </a>
+              <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "6px 0 0" }}>{t("planManageNote", { contact: CONTACT_EMAIL })}</p>
+            </>
           )}
         </>
       )}
