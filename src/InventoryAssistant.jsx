@@ -35,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
-import { LANGS, LOCALES, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
+import { LANGS, LOCALES, LANG_PATHS, langFromPath, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, summarize, toNumber } from "./inventoryLogic";
 import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
 import { load, save, remove } from "./storage";
@@ -95,8 +95,18 @@ function GlobalStyles() {
   );
 }
 
+// The bars look random but are the same on every load: the home page is also written into the
+// HTML when the site is built, and the page React draws on top of it has to look the same.
+const BARCODE_BARS = (() => {
+  let seed = 2026;
+  return Array.from({ length: 60 }, () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647 > 0.5;
+  });
+})();
+
 function BarcodeStrip({ animated = false }) {
-  const bars = useMemo(() => Array.from({ length: 60 }, () => Math.random() > 0.5), []);
+  const bars = BARCODE_BARS;
   return (
     <div style={{ position: "relative", height: 14, overflow: "hidden" }} aria-hidden="true">
       <div style={{ display: "flex", gap: 2, height: 14, alignItems: "stretch", opacity: 0.55 }}>
@@ -122,6 +132,15 @@ function BarcodeStrip({ animated = false }) {
   );
 }
 
+// The language links are real links (mikardex.cl/ and mikardex.cl/en/), so Google can follow them.
+// A plain click changes the language in place, without reloading and without losing what is loaded;
+// with Ctrl, Cmd or the middle button the link opens like any other.
+function followLangLink(event, code, onChange) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  onChange(code);
+}
+
 function LanguageToggle({ lang, onChange }) {
   return (
     <div
@@ -130,26 +149,52 @@ function LanguageToggle({ lang, onChange }) {
       style={{ display: "inline-flex", border: `1px solid ${COLORS.ink}`, borderRadius: 6, overflow: "hidden" }}
     >
       {LANGS.map((code) => (
-        <button
+        <a
           key={code}
-          onClick={() => onChange(code)}
-          aria-pressed={lang === code}
+          href={LANG_PATHS[code]}
+          hrefLang={code}
+          onClick={(event) => followLangLink(event, code, onChange)}
+          aria-current={lang === code ? "true" : undefined}
           style={{
             fontFamily: FONT_MONO,
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: "0.06em",
             padding: "6px 11px",
-            border: "none",
+            textDecoration: "none",
             background: lang === code ? COLORS.ink : "transparent",
             color: lang === code ? "#F4F1EA" : COLORS.ink,
             cursor: "pointer",
           }}
         >
           {code.toUpperCase()}
-        </button>
+        </a>
       ))}
     </div>
+  );
+}
+
+// The page no longer changes language by itself, so a visitor whose browser is in the other
+// language gets a link to it, written in that language. It appears once the page has loaded and
+// only for someone who has not chosen a language yet.
+function OtherLanguageLink({ lang, onChange }) {
+  const [other, setOther] = useState(null);
+  useEffect(() => {
+    const browser = detectLang();
+    setOther(browser !== lang && load("lang", null) === null ? browser : null);
+  }, [lang]);
+  if (!other) return null;
+  return (
+    <a
+      href={LANG_PATHS[other]}
+      hrefLang={other}
+      lang={other}
+      data-testid="other-language"
+      onClick={(event) => followLangLink(event, other, onChange)}
+      style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: COLORS.ink, textUnderlineOffset: 3 }}
+    >
+      {translator(other)("langHint")}
+    </a>
   );
 }
 
@@ -539,7 +584,8 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
         boxSizing: "border-box",
       }}
     >
-      <div style={{ position: "absolute", top: 18, right: 18 }}>
+      <div style={{ position: "absolute", top: 18, right: 18, display: "flex", alignItems: "center", gap: 12 }}>
+        <OtherLanguageLink lang={lang} onChange={onLang} />
         <LanguageToggle lang={lang} onChange={onLang} />
       </div>
 
@@ -679,13 +725,17 @@ function historyForApi(messages) {
   return turns.slice(-6);
 }
 
-export default function InventoryAssistant() {
+// path: only given when the site is built, to write each language's home page into the HTML
+// (scripts/prerender.js). In the browser the address is read from the address bar.
+export default function InventoryAssistant({ path }) {
   useGoogleFonts();
   const isMobile = useIsMobile();
 
   const [lang, setLang] = useState(() => {
+    // A language the visitor chose before comes first; for everyone else the address decides.
     const stored = load("lang", null);
-    return LANGS.includes(stored) ? stored : detectLang();
+    if (LANGS.includes(stored)) return stored;
+    return langFromPath(path !== undefined ? path : window.location.pathname);
   });
   const t = useMemo(() => translator(lang), [lang]);
 
@@ -743,8 +793,12 @@ export default function InventoryAssistant() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = lang === "es" ? "MiKardex · Pregúntale a tu inventario" : "MiKardex · Ask Your Inventory";
-  }, [lang]);
+    document.title = t("seoTitle");
+    // The address follows the language, so a link copied from the address bar opens in the same language.
+    if (langFromPath(window.location.pathname) !== lang) {
+      window.history.replaceState(window.history.state, "", LANG_PATHS[lang] + window.location.search + window.location.hash);
+    }
+  }, [lang, t]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

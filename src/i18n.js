@@ -5,8 +5,23 @@ export const LANGS = ["es", "en"];
 
 export const LOCALES = { en: "en-CA", es: "es-CL" };
 
+// Each language has its own address: mikardex.cl/ is Spanish and mikardex.cl/en/ is English.
+// Google reads every address on its own and browses in English, so the address (not the
+// visitor's browser) has to decide the language, or Google only ever sees the English page.
+export const LANG_PATHS = { es: "/", en: "/en/" };
+
+export function langFromPath(path) {
+  return /^\/en(\/|$)/i.test(String(path || "")) ? "en" : "es";
+}
+
 const STRINGS = {
   en: {
+    // What Google shows: the blue title of the result and the two lines under it.
+    seoTitle: "MiKardex · Inventory analysis from your Excel: what to reorder and what is not selling",
+    seoDescription:
+      "Upload your inventory spreadsheet and see what to reorder, what is about to run out and what is not selling. It also reads your SAP cycle count report. Free to start, no sign-up.",
+    langHint: "View in English",
+
     brand: "Inventory Manifest · Powered by MiKardex",
     title: "Ask Your Inventory",
     tagline:
@@ -813,6 +828,12 @@ const STRINGS = {
   },
 
   es: {
+    // Lo que muestra Google: el título azul del resultado y las dos líneas de abajo.
+    seoTitle: "MiKardex · Analiza tu inventario desde Excel: qué reponer y qué no se vende",
+    seoDescription:
+      "Sube tu Excel de inventario y mira qué reponer, qué está por agotarse y qué no se vende. También lee tu reporte de conteos cíclicos de SAP. Gratis para empezar, sin registro.",
+    langHint: "Ver en español",
+
     brand: "Control de inventario · Powered by MiKardex",
     title: "Pregúntale a tu inventario",
     tagline:
@@ -1620,6 +1641,8 @@ const STRINGS = {
   },
 };
 
+// The language of the visitor's browser. It no longer decides the language of the page (the
+// address does): it is only used to offer the other language to someone who may prefer it.
 export function detectLang() {
   try {
     const list = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];

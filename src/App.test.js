@@ -23,7 +23,7 @@ test("welcome screen offers upload and sample data, in both languages", () => {
   expect(screen.getByRole("button", { name: /Upload your Excel/ })).toBeInTheDocument();
   expect(screen.getByText("Try with sample data")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
   expect(screen.getByText("Quién está detrás")).toBeInTheDocument();
   expect(screen.getByText(/Trabajó en bodegas y control de inventario en Canadá y Nueva Zelanda/)).toBeInTheDocument();
@@ -93,13 +93,13 @@ test("the free plan allows three uploads: the second and third open the file pic
 test("the home page states the free trial in both languages", () => {
   render(<App />);
   expect(screen.getByText("Free trial: 3 uploads of your Excel and 3 questions. No sign-up.")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   expect(screen.getByText("Prueba gratis: 3 subidas de tu Excel y 3 preguntas. Sin registro.")).toBeInTheDocument();
 });
 
 test("the home page goes: how it works, the cycle count tool, free trial and plan, who is behind it", async () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   const order = ["Cómo funciona", "Informe de conteos cíclicos", "Prueba gratis y plan", "Quién está detrás"].map((title) => screen.getByRole("heading", { name: title }));
   for (let i = 0; i < order.length - 1; i += 1) {
     // each heading comes before the next one in the page
@@ -238,7 +238,7 @@ test("after trying the sample, the home page still leads back to the visitor's o
 test("the cycle count example shows its conclusions and stays in the browser", () => {
   window.scrollTo = () => {};
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   expect(screen.getByText("Informe de conteos cíclicos")).toBeInTheDocument();
   global.fetch.mockClear();
 
@@ -273,7 +273,7 @@ test("the cycle count example shows its conclusions and stays in the browser", (
   // what was typed is still there on the way back, and after a change of language
   fireEvent.click(screen.getByTestId("counts-continue"));
   expect(screen.getByTestId("count-total")).toHaveValue(600);
-  fireEvent.click(screen.getByRole("button", { name: "EN" }));
+  fireEvent.click(screen.getByRole("link", { name: "EN" }));
   expect(screen.getByTestId("count-total")).toHaveValue(600);
   expect(screen.getByText(/of 600 locations were counted/)).toBeInTheDocument();
   expect(screen.getByText(/The first is Interfold paper towel x20/)).toBeInTheDocument();
@@ -282,7 +282,7 @@ test("the cycle count example shows its conclusions and stays in the browser", (
 test("the count report says where to count: cycle, filter and areas", () => {
   window.scrollTo = () => {};
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   fireEvent.click(screen.getByTestId("counts-sample"));
 
   // the cycle is set at the top of the report, in days and months
@@ -317,7 +317,7 @@ test("the dashboard has the cycle counts, and the way to the report and back", (
   window.scrollTo = () => {};
   jest.useFakeTimers();
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   fireEvent.click(screen.getByText("Probar con datos de ejemplo"));
   act(() => {
     jest.runAllTimers();
@@ -345,7 +345,7 @@ test("the cycle count has its own tab next to the dashboard", () => {
   window.scrollTo = () => {};
   jest.useFakeTimers();
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   fireEvent.click(screen.getByText("Probar con datos de ejemplo"));
   act(() => {
     jest.runAllTimers();
@@ -378,7 +378,7 @@ test("the list of last counts is exported as it stands on screen", async () => {
   window.scrollTo = () => {};
   exportLastCounted.mockClear();
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
   fireEvent.click(screen.getByTestId("counts-sample"));
 
   fireEvent.change(screen.getByTestId("count-last-filter"), { target: { value: "outside" } });
@@ -405,4 +405,60 @@ test("the list of last counts is exported as it stands on screen", async () => {
 
   fireEvent.change(screen.getByTestId("count-last-search"), { target: { value: "zz-99" } });
   expect(screen.getByTestId("count-last-export")).toBeDisabled();
+});
+
+// The address decides the language, so Google (which browses in English) reads Spanish at
+// mikardex.cl/ and English at mikardex.cl/en/.
+
+test("mikardex.cl/ is in Spanish for a new visitor, also with a browser in English", async () => {
+  window.history.replaceState(null, "", "/");
+  render(<App />);
+  expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pregúntale a tu inventario");
+  expect(document.documentElement.lang).toBe("es");
+  expect(document.title).toMatch(/^MiKardex · Analiza tu inventario desde Excel/);
+  expect(window.location.pathname).toBe("/");
+  expect(screen.getByRole("link", { name: "ES" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/");
+
+  // the browser of the tests is in English: the page stays in Spanish and offers English
+  const offer = await screen.findByTestId("other-language");
+  expect(offer).toHaveTextContent("View in English");
+  expect(offer).toHaveAttribute("href", "/en/");
+  fireEvent.click(offer);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
+  expect(window.location.pathname).toBe("/en/");
+  expect(screen.queryByTestId("other-language")).not.toBeInTheDocument();
+});
+
+test("the language switch moves the address with it and is remembered", () => {
+  render(<App />); // starts at /en/
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
+  expect(document.documentElement.lang).toBe("en");
+  expect(document.title).toMatch(/^MiKardex · Inventory analysis from your Excel/);
+  expect(screen.queryByTestId("other-language")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("link", { name: "ES" }));
+  expect(window.location.pathname).toBe("/");
+  expect(document.documentElement.lang).toBe("es");
+  expect(JSON.parse(window.localStorage.getItem("mikardex.lang"))).toBe("es");
+
+  fireEvent.click(screen.getByRole("link", { name: "EN" }));
+  expect(window.location.pathname).toBe("/en/");
+  expect(JSON.parse(window.localStorage.getItem("mikardex.lang"))).toBe("en");
+});
+
+test("a visitor who chose English before gets English at mikardex.cl/, and the address follows", () => {
+  window.history.replaceState(null, "", "/");
+  window.localStorage.setItem("mikardex.lang", JSON.stringify("en"));
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
+  expect(window.location.pathname).toBe("/en/");
+});
+
+test("Ctrl+click on a language opens it as a normal link instead of switching in place", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("link", { name: "ES" }), { ctrlKey: true });
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask Your Inventory");
+  expect(window.location.pathname).toBe("/en/");
 });
