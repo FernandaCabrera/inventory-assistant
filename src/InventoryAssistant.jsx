@@ -18,6 +18,7 @@ import {
   Home,
   ClipboardCheck,
   ShieldCheck,
+  Mail,
 } from "lucide-react";
 import { sampleInventory } from "./data/sample";
 import ExcelJS from "exceljs/dist/exceljs.min.js";
@@ -35,9 +36,9 @@ import {
   Legend,
 } from "recharts";
 import { COLORS, STATUS_STYLE, FONT_MONO, FONT_HEAD, FONT_BODY, primaryButton, secondaryButton } from "./theme";
-import { LANGS, LOCALES, LANG_PATHS, detectLang, translator, formatNumber, formatMoney, countText } from "./i18n";
+import { LANGS, LOCALES, LANG_PATHS, detectLang, translator, formatNumber, formatMoney, countText, fill } from "./i18n";
 import { STATUS_ORDER, statusFor, daysOfCover, summarize, toNumber } from "./inventoryLogic";
-import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS } from "./config";
+import { FREE_UPLOADS, FREE_QUESTIONS, EXCESS_RATIO, MAX_ROWS, SHOW_PROMPT, ORDER_COVER_DAYS, CONTACT_EMAIL, OWNER_LINKEDIN } from "./config";
 import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
 import UpgradeModal from "./UpgradeModal";
@@ -46,7 +47,7 @@ import { cleanCode } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HowItWorks, Plans, AboutAndData, Footer, PrivacyModal } from "./HomeSections";
-import LandingPage from "./LandingPage";
+import LandingPage, { landingVars, bottomLink } from "./LandingPage";
 import { landingText } from "./landingText";
 import { PAGES, pageFromPath, landingPagesIn } from "./pages";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
@@ -595,6 +596,33 @@ function CountsPrivacy({ t }) {
   );
 }
 
+// Opens the visitor's email with the address and the subject already written
+function mailLink(page) {
+  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(page.mailSubject)}`;
+}
+
+// The button of a page about a service. The line under it shows the address, for whoever
+// prefers to copy it, and who is behind the service.
+function ContactButton({ t, lang, page }) {
+  return (
+    <>
+      <a
+        href={mailLink(page)}
+        data-testid="service-mail"
+        style={{ ...primaryButton, padding: "14px 24px", fontSize: 13, textDecoration: "none" }}
+      >
+        <Mail size={15} /> {page.cta}
+      </a>
+      <p style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.5, margin: "14px 0 0" }}>
+        {fill(page.note, landingVars(lang, t))} ·{" "}
+        <a href={OWNER_LINKEDIN} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.ink, textUnderlineOffset: 3 }}>
+          {t("aboutLinkedin")}
+        </a>
+      </p>
+    </>
+  );
+}
+
 // A link from a block of the home page to the page that explains it in full
 const moreLink = {
   display: "inline-flex",
@@ -744,7 +772,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
       <HowItWorks t={t} more={PAGES.analysis[lang]} />
       <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} more={PAGES.counts[lang]} />
       <Plans t={t} lang={lang} onPlan={onPlan} />
-      <AboutAndData t={t} onPrivacy={onPrivacy} />
+      <AboutAndData t={t} onPrivacy={onPrivacy} service={PAGES.excel[lang] ? { href: PAGES.excel[lang], label: landingText("excel", lang).navLabel } : null} />
       <Footer t={t} onPrivacy={onPrivacy} links={pageLinks(lang, t, "home")} />
     </div>
   );
@@ -1394,9 +1422,39 @@ export default function InventoryAssistant({ path }) {
     );
   }
 
+  // What a page offers under its heading. The pages about a tool carry that tool's buttons, the
+  // same as on the home page; the page about the service carries the button that writes an email.
+  function landingButtons(id) {
+    if (id === "counts") {
+      return {
+        actions: <CountButtons t={t} counts={counts} onUpload={openCountImport} onSample={loadSampleCounts} onContinue={showCountReport} />,
+        note: <CountsPrivacy t={t} />,
+      };
+    }
+    if (id === "excel") {
+      const page = landingText(id, lang);
+      return {
+        actions: <ContactButton t={t} lang={lang} page={page} />,
+        note: null,
+        closing: (
+          <a href={mailLink(page)} style={bottomLink}>
+            <Mail size={15} /> {page.bottom.link}
+          </a>
+        ),
+      };
+    }
+    return {
+      actions: <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />,
+      note: (
+        <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "16px 0 0", maxWidth: 720 }}>
+          {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}
+        </p>
+      ),
+    };
+  }
+
   if (!hasEntered && shownPage !== "home") {
-    // Each page offers the tool it is about, with the same buttons as the home page
-    const forCounts = shownPage === "counts";
+    const buttons = landingButtons(shownPage);
     return (
       <>
         <GlobalStyles />
@@ -1405,22 +1463,9 @@ export default function InventoryAssistant({ path }) {
           lang={lang}
           t={t}
           toggle={<LanguageToggle lang={lang} onChange={changeLang} paths={PAGES[shownPage]} />}
-          actions={
-            forCounts ? (
-              <CountButtons t={t} counts={counts} onUpload={openCountImport} onSample={loadSampleCounts} onContinue={showCountReport} />
-            ) : (
-              <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />
-            )
-          }
-          note={
-            forCounts ? (
-              <CountsPrivacy t={t} />
-            ) : (
-              <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "16px 0 0", maxWidth: 720 }}>
-                {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}
-              </p>
-            )
-          }
+          actions={buttons.actions}
+          note={buttons.note}
+          closing={buttons.closing}
           footer={<Footer t={t} onPrivacy={openPrivacy} links={pageLinks(lang, t, shownPage)} />}
         />
         {modals}

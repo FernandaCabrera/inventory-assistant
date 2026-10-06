@@ -508,8 +508,8 @@ test("the cycle count page switches between its two languages in place", () => {
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Cycle count report from your SAP Excel export");
   expect(document.title).toBe("Cycle count report from your SAP Excel export · MiKardex");
   expect(document.body.textContent).not.toMatch(/\{\w+\}/);
-  // English has this one page: the links at the bottom offer only the home page
-  expect(within(screen.getByTestId("page-links")).getAllByRole("link")).toHaveLength(1);
+  // the links at the bottom offer the pages that exist in English: the home page and the Excel service
+  expect(within(screen.getByTestId("page-links")).getAllByRole("link").map((a) => a.textContent)).toEqual(["Home", "Excel automation"]);
 
   fireEvent.click(screen.getByRole("link", { name: "ES" }));
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Informe de conteo cíclico a partir del Excel de SAP");
@@ -557,14 +557,49 @@ test("the home page links to the pages that exist in its language", () => {
   const links = within(screen.getByTestId("page-links"));
   expect(links.getByRole("link", { name: "Informe de conteo cíclico" })).toHaveAttribute("href", "/conteo-ciclico-sap/");
   expect(links.getByRole("link", { name: "Análisis de inventario en Excel" })).toHaveAttribute("href", "/analisis-inventario-excel/");
+  expect(links.getByRole("link", { name: "Automatización de Excel" })).toHaveAttribute("href", "/automatizacion-excel/");
+  expect(screen.getByTestId("about-service")).toHaveAttribute("href", "/automatizacion-excel/");
   expect(screen.getByRole("link", { name: /Qué necesita tu Excel y cómo se calcula/ })).toHaveAttribute("href", "/analisis-inventario-excel/");
   expect(screen.getByRole("link", { name: /Qué archivo sirve y cómo se mide/ })).toHaveAttribute("href", "/conteo-ciclico-sap/");
 
   fireEvent.click(screen.getByRole("link", { name: "EN" }));
   const english = within(screen.getByTestId("page-links"));
   expect(english.getByRole("link", { name: "Cycle count report" })).toHaveAttribute("href", "/en/cycle-count-report/");
-  expect(english.getAllByRole("link")).toHaveLength(1);
+  expect(english.getByRole("link", { name: "Excel automation" })).toHaveAttribute("href", "/en/excel-automation/");
+  expect(english.getAllByRole("link")).toHaveLength(2);
+  expect(screen.getByTestId("about-service")).toHaveAttribute("href", "/en/excel-automation/");
   expect(screen.getByRole("link", { name: /Which file works and how it is measured/ })).toHaveAttribute("href", "/en/cycle-count-report/");
   // the analysis page has no English version yet: no link to it
   expect(screen.queryByRole("link", { name: /What your Excel needs/ })).not.toBeInTheDocument();
+});
+
+test("the Excel automation page says what the service is and its button writes an email", () => {
+  window.history.replaceState(null, "", "/automatizacion-excel/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Automatización de Excel para tu negocio");
+  expect(document.title).toBe("Automatización de Excel a medida para tu negocio · MiKardex");
+  expect(screen.getByRole("heading", { level: 2, name: "Qué puedo hacer con tu Excel" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 2, name: "No solo inventario" })).toBeInTheDocument();
+  expect(screen.getByText(/Trabajo con inteligencia artificial y con fórmulas que aplico yo misma/)).toBeInTheDocument();
+  expect(screen.getByText(/Soy Fernanda Cabrera, creadora de MiKardex/)).toBeInTheDocument();
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
+
+  // a service, not a tool: no upload buttons, and the button opens an email to the contact address
+  expect(screen.queryByRole("button", { name: /Sube tu Excel/ })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("counts-upload")).not.toBeInTheDocument();
+  const mail = screen.getByTestId("service-mail");
+  expect(mail).toHaveTextContent("Escribir por correo");
+  expect(mail).toHaveAttribute("href", "mailto:hola@mikardex.cl?subject=Automatizaci%C3%B3n%20de%20Excel");
+  // the address is also written out, and the closing block leads to the same email
+  expect(screen.getAllByText(/hola@mikardex\.cl/).length).toBeGreaterThan(1);
+  expect(screen.getAllByRole("link", { name: /Escribir por correo/ })).toHaveLength(2);
+  // no price is stated on the page
+  expect(document.body.textContent).not.toMatch(/USD|\$\s?\d/);
+
+  // it exists in English too, and the switch changes it in place
+  fireEvent.click(screen.getByRole("link", { name: "EN" }));
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Excel automation for your business");
+  expect(window.location.pathname).toBe("/en/excel-automation/");
+  expect(screen.getByTestId("service-mail")).toHaveAttribute("href", "mailto:hola@mikardex.cl?subject=Excel%20automation");
+  expect(document.body.textContent).not.toMatch(/\{\w+\}/);
 });

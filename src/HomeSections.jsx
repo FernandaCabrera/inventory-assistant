@@ -98,7 +98,8 @@ export function Plans({ t, lang, onPlan }) {
   );
 }
 
-export function AboutAndData({ t, onPrivacy }) {
+// service: the page about the Excel automation service, as { href, label }, when it exists in this language
+export function AboutAndData({ t, onPrivacy, service }) {
   return (
     <section style={{ ...wrap, display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 36 }}>
       <div style={{ ...box, flex: "1 1 340px" }}>
@@ -111,6 +112,11 @@ export function AboutAndData({ t, onPrivacy }) {
           <a href={`mailto:${CONTACT_EMAIL}`} style={{ ...link, display: "inline-flex", alignItems: "center", gap: 6 }}>
             <Mail size={14} /> {CONTACT_EMAIL}
           </a>
+          {service && (
+            <a href={service.href} data-testid="about-service" style={{ ...link, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {service.label} <ArrowRight size={14} />
+            </a>
+          )}
         </div>
       </div>
 

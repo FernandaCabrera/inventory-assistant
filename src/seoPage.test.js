@@ -58,8 +58,10 @@ test("the address decides the page", () => {
     expect(p.path).toMatch(/^\/([a-z0-9-]+\/)*$/);
     expect(p.path.startsWith("/en/")).toBe(p.lang === "en");
   }
-  expect(landingPagesIn("es")).toEqual(["counts", "analysis"]);
-  expect(landingPagesIn("en")).toEqual(["counts"]);
+  expect(pageFromPath("/automatizacion-excel/")).toEqual({ id: "excel", lang: "es" });
+  expect(pageFromPath("/en/excel-automation/")).toEqual({ id: "excel", lang: "en" });
+  expect(landingPagesIn("es")).toEqual(["counts", "analysis", "excel"]);
+  expect(landingPagesIn("en")).toEqual(["counts", "excel"]);
 });
 
 test("each page has its own title and description, short enough for a search result", () => {
@@ -175,8 +177,8 @@ test("the sitemap lists every page once, with its versions in other languages", 
   for (const page of pages) {
     expect(count(sitemap, new RegExp(`<loc>${SITE_URL}${page.path}</loc>`, "g"))).toBe(1);
   }
-  // the home page and the cycle count page exist in two languages: each version lists both and the default
-  expect(count(sitemap, /hreflang="x-default"/g)).toBe(4);
+  // the home page, the cycle count page and the Excel service exist in two languages: each version lists both and the default
+  expect(count(sitemap, /hreflang="x-default"/g)).toBe(6);
   expect(count(sitemap, /hreflang="en" href="https:\/\/www\.mikardex\.cl\/en\/cycle-count-report\/"/g)).toBe(2);
   // the page in Spanish only lists nothing else
   const analysis = sitemap.split("<url>").find((block) => block.includes("/analisis-inventario-excel/"));
