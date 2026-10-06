@@ -5,6 +5,7 @@ import {
   extractTable,
   validateMapping,
   buildInventory,
+  reviewImport,
 } from "./importLogic";
 import { statusFor, daysOfCover, tiedUpValue, summarize } from "./inventoryLogic";
 
@@ -31,6 +32,16 @@ describe("guessMapping", () => {
     expect(m).toMatchObject({
       sku: 0, name: 1, warehouse: 2, stock: 3, reorder_point: 4, lead_time_days: 5, avg_daily_usage: 6, sales: null,
     });
+  });
+
+  test("who sold and when are not units sold", () => {
+    const m = guessMapping(["Cliente", "Fecha", "Monto", "Vendedor"]);
+    expect(m.sales).toBeNull();
+    expect(guessMapping(["Producto", "Stock", "Fecha de venta", "N° de venta", "Canal de ventas"]).sales).toBeNull();
+    expect(guessMapping(["Product", "Stock", "Sales rep", "Sale date"]).sales).toBeNull();
+    // the real thing is still found next to them
+    expect(guessMapping(["Producto", "Stock", "Vendedor", "Fecha de venta", "Unidades vendidas"]).sales).toBe(4);
+    expect(guessMapping(["Product", "Stock", "Sales rep", "Sales last 30 days"]).sales).toBe(3);
   });
 
   test("messy real-world headers", () => {
@@ -71,9 +82,30 @@ describe("parseNumber", () => {
     ["−4", -4],
     ["–5", -5],
     ["12 un", 12],
+    ["12 unidades", 12],
+    ["3,5 kg", 3.5],
+    ["45%", 45],
+    ["1 234", 1234],
+    ["1 234,5", 1234.5],
+    ["USD 12", 12],
+    ["1.500 CLP", 1500],
+    ["-$ 1.500", -1500],
+    ["$ -1.500", -1500],
+    ["$12.990.-", 12990],
+    ["1.500 $", 1500],
     ["", null],
     ["abc", null],
     [null, null],
+    // text, dates and codes with digits in them are not numbers
+    ["Café grano 1 kg", null],
+    ["Té verde 100 bolsas", null],
+    ["2026-09-01", null],
+    ["01/09/2026", null],
+    ["12:30", null],
+    ["A-12-3", null],
+    ["F-100", null],
+    ["12 x 6", null],
+    ["1.2.3,4,5", null],
   ])("%p -> %p", (input, expected) => {
     expect(parseNumber(input)).toBe(expected);
   });
@@ -213,5 +245,68 @@ describe("buildInventory", () => {
     expect(statusFor({ stock: 14, reorder_point: 21, avg_daily_usage: 2 })).toBe("low");
     expect(statusFor({ stock: 72, reorder_point: 36, avg_daily_usage: 10 })).toBe("ok");
     expect(statusFor({ stock: 200, reorder_point: 36, avg_daily_usage: 10 })).toBe("excess");
+  });
+});
+
+describe("reviewImport: does the file look like an inventory?", () => {
+  const settings = { salesPeriodDays: 30, defaultLeadTime: 7, defaultWarehouse: "Principal" };
+  function review(grid) {
+    const table = extractTable(grid);
+    const mapping = guessMapping(table.headers);
+    return { ...reviewImport(table, mapping, buildInventory(table, mapping, settings)), mapping };
+  }
+  const codes = (result) => result.warnings.map((w) => w.code);
+
+  test("a normal inventory has no warnings, and the first rows are shown as they were read", () => {
+    const result = review([
+      ["Código", "Producto", "Bodega", "Stock", "Ventas últimos 30 días", "Costo unitario"],
+      ["A1", "Café grano 1 kg", "Central", 12, 45, 9500],
+      ["A2", "Té verde 100 bolsas", "Central", 50, 8, 4200],
+      ["A3", "Azúcar 1 kg", "Central", 0, 30, 1100],
+      ["A4", "Leche 1 L", "Norte", 24, 0, 950],
+      ["A1", "Café grano 1 kg", "Norte", 6, 20, 9500], // same product in another warehouse is fine
+      ["A5", "Galletas", "Central", 80, 12, 700],
+    ]);
+    expect(codes(result)).toEqual([]);
+    expect(result.total).toBe(6);
+    expect(result.preview).toHaveLength(3);
+    expect(result.preview[0]).toMatchObject({ sku: "A1", name: "Café grano 1 kg", stock: 12, avg_daily_usage: 1.5 });
+  });
+
+  test("a list of sales passes the column check but is flagged: repeated products and customer columns", () => {
+    const rows = [];
+    for (let i = 0; i < 12; i += 1) {
+      rows.push([`2026-09-${String(i + 1).padStart(2, "0")}`, `F-${100 + i}`, `Cliente ${i}`, i % 3 === 0 ? "Café" : i % 3 === 1 ? "Té" : "Azúcar", 2 + i, (2 + i) * 9500]);
+    }
+    const result = review([["Fecha de venta", "Factura", "Cliente", "Producto", "Cantidad", "Ventas"], ...rows]);
+    expect(validateMapping(result.mapping)).toEqual([]); // it has "product", "quantity" and "sales"
+    expect(codes(result)).toEqual(["warnRepeated", "warnTransactions"]);
+    expect(result.warnings[0]).toMatchObject({ n: 9, total: 12 });
+    expect(result.warnings[1].cols).toBe("Fecha de venta, Factura, Cliente");
+  });
+
+  test("a few repeated rows in a long inventory are not flagged", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => [`P${i}`, `Producto ${i}`, 10 + i, 5]);
+    rows.push(["P1", "Producto 1", 3, 5], ["P2", "Producto 2", 4, 5]);
+    expect(codes(review([["Código", "Producto", "Stock", "Ventas"], ...rows]))).toEqual([]);
+  });
+
+  test("without a code column, repeats are looked for by name", () => {
+    const rows = Array.from({ length: 8 }, (_, i) => [i % 2 === 0 ? "Café" : "Té", 10 + i, 5]);
+    expect(codes(review([["Producto", "Stock", "Ventas"], ...rows]))).toEqual(["warnRepeated"]);
+  });
+
+  test("a stock column that is mostly text is flagged", () => {
+    const result = review([
+      ["Producto", "Stock", "Ventas"],
+      ["Café", "bueno", 5], ["Té", "malo", 3], ["Azúcar", "regular", 9], ["Leche", 12, 4], ["Pan", 3, 2],
+    ]);
+    expect(codes(result)).toEqual(["warnUnreadStock"]);
+    expect(result.warnings[0]).toMatchObject({ n: 3, total: 5 });
+  });
+
+  test("a sales column where nothing sold is flagged; a file with only minimum stock is not", () => {
+    expect(codes(review([["Producto", "Stock", "Ventas"], ["Café", 5, 0], ["Té", 3, 0], ["Pan", 9, ""]]))).toEqual(["warnNoSales"]);
+    expect(codes(review([["Producto", "Stock", "Stock mínimo"], ["Café", 5, 10], ["Té", 3, 4], ["Pan", 9, 6]]))).toEqual([]);
   });
 });

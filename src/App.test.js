@@ -26,7 +26,9 @@ test("welcome screen offers upload and sample data, in both languages", () => {
   fireEvent.click(screen.getByRole("button", { name: "ES" }));
   expect(screen.getByRole("button", { name: /Sube tu Excel/ })).toBeInTheDocument();
   expect(screen.getByText("Quién está detrás")).toBeInTheDocument();
-  expect(screen.getByText(/99,99% de exactitud de inventario/)).toBeInTheDocument();
+  expect(screen.getByText(/Trabajó en bodegas y control de inventario en Canadá y Nueva Zelanda/)).toBeInTheDocument();
+  // no figures from a former employer on the page
+  expect(screen.queryByText(/99,99|25,2 millones|Vancouver/)).not.toBeInTheDocument();
   expect(screen.getByText("Pregúntale a tu inventario")).toBeInTheDocument();
 });
 
@@ -70,7 +72,7 @@ test("a stored upload on the free plan shows the dashboard locked", async () => 
 
   // once the three free uploads are used, another one opens the plan window instead of the file picker
   fireEvent.click(screen.getByText("Replace data"));
-  expect(screen.getByText(/The free plan includes 3 uploads of your Excel/)).toBeInTheDocument();
+  expect(screen.getByText(/The free trial includes 3 uploads of your Excel\. With the plan you upload your updated Excel every day/)).toBeInTheDocument();
   expect(screen.getByTestId("plan-price")).toHaveTextContent("Price: USD 12 per month");
   // the server has no PayPal set up: the plan is requested by email, there is no pay button
   expect(await screen.findByText("Request the plan")).toBeInTheDocument();
@@ -88,11 +90,39 @@ test("the free plan allows three uploads: the second and third open the file pic
   expect(screen.queryByText(/The free plan includes/)).not.toBeInTheDocument();
 });
 
-test("the home page states the free plan in both languages", () => {
+test("the home page states the free trial in both languages", () => {
   render(<App />);
-  expect(screen.getByText("Free: 3 uploads of your Excel and 3 questions. No sign-up.")).toBeInTheDocument();
+  expect(screen.getByText("Free trial: 3 uploads of your Excel and 3 questions. No sign-up.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "ES" }));
-  expect(screen.getByText("Gratis: 3 subidas de tu Excel y 3 preguntas. Sin registro.")).toBeInTheDocument();
+  expect(screen.getByText("Prueba gratis: 3 subidas de tu Excel y 3 preguntas. Sin registro.")).toBeInTheDocument();
+});
+
+test("the home page goes: how it works, the cycle count tool, free trial and plan, who is behind it", async () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "ES" }));
+  const order = ["Cómo funciona", "Informe de conteos cíclicos", "Prueba gratis y plan", "Quién está detrás"].map((title) => screen.getByRole("heading", { name: title }));
+  for (let i = 0; i < order.length - 1; i += 1) {
+    // each heading comes before the next one in the page
+    expect(order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+
+  // the cycle count tool says who it is for, what to upload and what comes out
+  const counts = within(screen.getByTestId("counts-band"));
+  expect(counts.getByText("Otra herramienta · para bodegas")).toBeInTheDocument();
+  ["Para quién", "Qué subes", "Qué obtienes"].forEach((label) => expect(counts.getByText(label)).toBeInTheDocument());
+
+  // what is free, what the plan adds, and the price, before hitting any limit
+  const plans = within(screen.getByTestId("plans"));
+  expect(plans.getByText("3 subidas de tu Excel")).toBeInTheDocument();
+  expect(plans.getByText("3 preguntas al asistente")).toBeInTheDocument();
+  expect(plans.getByText("Qué se agota primero y las primeras 3 filas de la lista de compra")).toBeInTheDocument();
+  expect(screen.getByTestId("home-price")).toHaveTextContent("USD 12 al mes");
+  expect(plans.getByText("Sube tu Excel actualizado todos los días, sin límite")).toBeInTheDocument();
+
+  // "See the plan" opens the plan window from the home page
+  fireEvent.click(plans.getByRole("button", { name: /Ver el plan/ }));
+  expect(screen.getByRole("dialog", { name: "Plan MiKardex" })).toBeInTheDocument();
+  expect(await screen.findByText("Solicitar el plan")).toBeInTheDocument();
 });
 
 test("the AI prompt is not shown to visitors", () => {

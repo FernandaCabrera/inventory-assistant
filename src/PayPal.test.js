@@ -91,7 +91,7 @@ test("after the free uploads, the plan window offers PayPal's subscribe button f
   render(<App />);
   await openPlanWindow();
 
-  expect(screen.getByText(/The free plan includes 3 uploads of your Excel/)).toBeInTheDocument();
+  expect(screen.getByText(/The free trial includes 3 uploads of your Excel/)).toBeInTheDocument();
   expect(screen.getByTestId("plan-price")).toHaveTextContent("Price: USD 12 per month");
   expect(screen.getByText(/Secure payment with PayPal/)).toBeInTheDocument();
   // paying replaces asking for the plan by email; a code can still be entered
