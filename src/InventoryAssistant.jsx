@@ -47,7 +47,7 @@ import { cleanCode } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HowItWorks, Plans, AboutAndData, Footer, PrivacyModal } from "./HomeSections";
-import LandingPage, { landingVars, bottomLink } from "./LandingPage";
+import LandingPage, { landingVars, bottomLink, DownloadButton } from "./LandingPage";
 import { landingText } from "./landingText";
 import { PAGES, pageFromPath, landingPagesIn } from "./pages";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
@@ -1443,8 +1443,14 @@ export default function InventoryAssistant({ path }) {
         ),
       };
     }
+    const start = <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />;
+    const file = landingText(id, lang).download;
+    if (file) {
+      // A guide with a file: the file comes first, and the tool is offered at the end of the page
+      return { actions: <DownloadButton file={file} />, note: null, closing: <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>{start}</div> };
+    }
     return {
-      actions: <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />,
+      actions: start,
       note: (
         <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "16px 0 0", maxWidth: 720 }}>
           {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}

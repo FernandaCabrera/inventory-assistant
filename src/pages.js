@@ -16,6 +16,9 @@ export const PAGES = {
   analysis: { es: "/analisis-inventario-excel/" },
   // A service, not a tool: its button writes an email instead of opening the tool
   excel: { es: "/automatizacion-excel/", en: "/en/excel-automation/" },
+  // Guides: they teach how to do something by hand, and then offer the tool
+  reorder: { es: "/punto-de-reorden-excel/" },
+  kardex: { es: "/kardex-excel/" },
 };
 
 // Every page that is not the tool itself

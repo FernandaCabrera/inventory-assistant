@@ -4,7 +4,10 @@
 //   - seoTitle and seoDescription are what Google shows: the blue title and the two lines under it.
 //   - navLabel is the name of the page in the links at the bottom of every page.
 //   - In "body", a text between quotes is a paragraph, a list in [ ] is a list of points, and
-//     { steps: [ ] } is a numbered list.
+//     { steps: [ ] } is a numbered list. A guide can also carry { table: { head, rows } },
+//     { formulas: [{ cell, what, formula }] } (Excel formulas to copy) and { see: [ ] } (links to
+//     other pages, by their name in src/pages.js).
+//   - "download" is a file the page offers (it lives in public/), with the text of its button.
 //   - {name} marks a value filled in from src/config.js (prices, limits, the numbers of the
 //     formulas, the contact email), so it is never written twice. The list of names is in
 //     src/LandingPage.jsx.
@@ -259,6 +262,7 @@ const TEXT = {
               "Clasificación ABC por valor de consumo: clase A, los productos que suman el primer {abcA}% del consumo; clase B, hasta el {abcB}%; clase C, el resto y los productos sin ventas.",
             ],
             "Estas cuentas se hacen en tu navegador con reglas fijas. La IA se usa solo para responder tus preguntas.",
+            { see: ["reorder", "kardex"] },
           ],
         },
         {
@@ -425,6 +429,270 @@ const TEXT = {
         },
       ],
       bottom: { h: "Tell me what you need", p: "Write to {email}. You can ask anything you want.", link: "Write by email" },
+    },
+  },
+
+  // Guide: how to work out the reorder point by hand in Excel. The numbers of its example are
+  // checked against the tool's own arithmetic in src/App.test.js: if a rule of the tool changes,
+  // that test says which sentence here stopped being true.
+  reorder: {
+    es: {
+      navLabel: "Punto de reorden en Excel",
+      seoTitle: "Punto de reorden en Excel: fórmula y ejemplo paso a paso · MiKardex",
+      seoDescription:
+        "Cómo calcular el punto de reorden en Excel: la fórmula, un ejemplo con números, las fórmulas listas para copiar, cuánto stock de seguridad dejar y los errores más comunes.",
+      eyebrow: "Guía · reposición de inventario",
+      h1: "Cómo calcular el punto de reorden en Excel",
+      lead: "El punto de reorden es el nivel de stock en el que hay que hacer un nuevo pedido para no quedarse sin producto antes de que llegue. Aquí están la fórmula, un ejemplo con números y las fórmulas de Excel listas para copiar.",
+      sections: [
+        {
+          h: "La fórmula",
+          body: [
+            "Punto de reorden = consumo diario × días de reposición + stock de seguridad.",
+            [
+              "Consumo diario: cuántas unidades vendes o usas por día, en promedio.",
+              "Días de reposición: cuánto se demora el proveedor desde que haces el pedido hasta que el producto está en tu bodega.",
+              "Stock de seguridad: un margen por si vendes más de lo normal o el proveedor se atrasa.",
+            ],
+            "La idea es simple: mientras esperas el pedido, sigues vendiendo. El punto de reorden es lo que vas a vender durante esa espera, más un margen.",
+          ],
+        },
+        {
+          h: "Un ejemplo con números",
+          body: [
+            "Vendes toallas de papel. En los últimos 30 días vendiste 120 cajas y tu proveedor se demora 7 días en entregar.",
+            {
+              steps: [
+                "Consumo diario: 120 ÷ 30 = 4 cajas por día.",
+                "Venta durante la espera: 4 × 7 = 28 cajas.",
+                "Stock de seguridad: la mitad de eso, 14 cajas.",
+                "Punto de reorden: 28 + 14 = 42 cajas.",
+              ],
+            },
+            "Cuando te queden 42 cajas, haces el pedido. Si esperas a que queden 20, lo más probable es que te quedes sin stock antes de que llegue.",
+          ],
+        },
+        {
+          h: "Cuánto stock de seguridad dejar",
+          body: [
+            "Hay dos formas comunes de calcularlo.",
+            [
+              "Un porcentaje de la venta durante la espera: es la más simple. Con un {pct}%, la fórmula queda consumo diario × días de reposición × {factor}. Es la que usa MiKardex cuando tu archivo no trae el punto de reorden.",
+              "El peor caso menos el caso normal: (venta diaria máxima × días de reposición máximos) − (venta diaria promedio × días de reposición promedio). Sirve si llevas registro de tus mejores días de venta y de los atrasos del proveedor.",
+            ],
+            "Con el ejemplo: si en tu mejor día vendes 6 cajas y el proveedor se ha demorado hasta 10 días, el stock de seguridad es 6 × 10 − 4 × 7 = 32 cajas, y el punto de reorden sube a 60.",
+            "Mientras más caro te salga quedarte sin el producto, más margen conviene. Mientras más capital deje detenido tenerlo guardado, menos.",
+          ],
+        },
+        {
+          h: "Las fórmulas en Excel",
+          body: [
+            "Arma una tabla con una fila por producto y estas columnas:",
+            {
+              table: {
+                head: ["", "A", "B", "C", "D"],
+                rows: [
+                  ["1", "Producto", "Stock", "Vendidas en 30 días", "Días de reposición"],
+                  ["2", "Toalla de papel x20", "35", "120", "7"],
+                ],
+              },
+            },
+            "Escribe estas fórmulas en la fila 2 y cópialas hacia abajo para el resto de los productos:",
+            {
+              formulas: [
+                { cell: "E2", what: "Consumo diario", formula: "=C2/30" },
+                { cell: "F2", what: "Punto de reorden", formula: "=REDONDEAR.MAS(E2*D2*{factor};0)" },
+                { cell: "G2", what: "¿Hay que pedir?", formula: '=SI(B2<F2;"Pedir";"OK")' },
+                { cell: "H2", what: "Días de cobertura", formula: '=SI(E2>0;B2/E2;"")' },
+                { cell: "I2", what: "Cantidad a pedir", formula: "=SI(B2<F2;REDONDEAR.MAS(F2+E2*{coverDays}-B2;0);0)" },
+              ],
+            },
+            "Con el ejemplo: el consumo diario da 4 y el punto de reorden, 42. Quedan 35 cajas, que alcanzan para menos de 9 días, así que hay que pedir. La cantidad sugerida es 127: llegar al punto de reorden (42) más {coverDays} días de venta (120), menos lo que tienes (35).",
+            "Las fórmulas están escritas para Excel en español, que separa con punto y coma y usa coma decimal. En Excel en inglés las funciones son ROUNDUP e IF, y se separa con comas: =ROUNDUP(E2*D2*{factorPlain},0).",
+          ],
+        },
+        {
+          h: "Errores comunes",
+          body: [
+            [
+              "Calcular con un mes en que estuviste sin stock: si no había producto, vendiste menos de lo que te pidieron, y el consumo diario sale más bajo que el real.",
+              "No actualizar los días de reposición: si el proveedor pasó de 7 a 15 días, el punto de reorden antiguo ya no te cubre.",
+              "Usar el mismo punto de reorden todo el año en productos de temporada.",
+              "Olvidar lo que ya está pedido: si hay un pedido en camino, súmalo al stock antes de decidir si pedir de nuevo.",
+              "Calcularlo una vez y no volver a mirarlo: las ventas cambian, y conviene recalcular cada mes.",
+            ],
+          ],
+        },
+        {
+          h: "Si no quieres armar las fórmulas",
+          body: [
+            "MiKardex hace estas mismas cuentas para todos tus productos a la vez. Subes tu Excel con producto, stock y unidades vendidas, y te muestra qué se agota primero y la lista de compra con la cantidad de cada producto, descontando lo que ya está pedido.",
+            "La prueba es gratis y sin registro: {uploads} y {questions} preguntas al asistente.",
+            { see: ["analysis", "kardex"] },
+          ],
+        },
+      ],
+      faqTitle: "Preguntas frecuentes",
+      faq: [
+        {
+          q: "¿Punto de reorden y stock mínimo son lo mismo?",
+          a: "No. El stock mínimo, o de seguridad, es el margen que no quieres tocar. El punto de reorden es más alto: incluye ese margen más lo que vas a vender mientras llega el pedido.",
+        },
+        {
+          q: "¿Qué período de ventas uso?",
+          a: "Uno que se parezca a lo que viene. Para productos estables, los últimos 30 a 90 días. Para productos de temporada, el mismo período del año anterior.",
+        },
+        {
+          q: "¿Y si un producto casi no se vende?",
+          a: "Con muy pocas ventas, el promedio diario dice poco. En esos casos funciona mejor fijar un mínimo a mano, por ejemplo una o dos unidades, y reponer cuando se vende.",
+        },
+      ],
+      bottom: { h: "Calcula el punto de reorden de todo tu inventario", p: "Sube tu Excel y mira qué hay que pedir hoy, o prueba primero con los datos de ejemplo.", link: "Subir mi Excel o ver el ejemplo" },
+    },
+  },
+
+  // Guide: what a kardex is and how to keep one in Excel, with a template to download. The
+  // template is public/plantillas/plantilla-kardex-mikardex.xlsx; the example in this text is
+  // the one loaded in that file, so the two have to change together.
+  kardex: {
+    es: {
+      navLabel: "Kardex en Excel (plantilla)",
+      seoTitle: "Kardex en Excel: plantilla gratis con fórmulas · MiKardex",
+      seoDescription:
+        "Descarga una plantilla de kardex en Excel con las fórmulas listas: entradas, salidas, saldo y costo promedio ponderado. Con un ejemplo paso a paso y los errores más comunes.",
+      eyebrow: "Guía · control de inventario",
+      h1: "Kardex en Excel: plantilla gratis y cómo llevarlo",
+      lead: "Un kardex es el registro de cada entrada y cada salida de un producto, con el saldo que queda después de cada movimiento. Aquí puedes descargar una plantilla en Excel con las fórmulas listas y ver, paso a paso, cómo se llena y cómo se calcula.",
+      download: {
+        href: "/plantillas/plantilla-kardex-mikardex.xlsx",
+        label: "Descargar la plantilla (Excel)",
+        note: "Gratis y sin registro. Archivo .xlsx con fórmulas, sin macros.",
+      },
+      sections: [
+        {
+          h: "Qué trae la plantilla",
+          body: [
+            [
+              "Una hoja por producto, con fórmulas para 300 movimientos.",
+              "Entradas, salidas y saldo, en unidades y en valor.",
+              "Costo promedio ponderado, que se recalcula solo con cada compra.",
+              "Un aviso cuando el saldo queda negativo.",
+              "Un ejemplo ya cargado y una hoja con las instrucciones.",
+            ],
+            "Tú escribes en las celdas amarillas: fecha, documento, cantidad y, en las compras, el costo. Lo demás sale de fórmulas básicas de Excel (SUMA y SI).",
+          ],
+        },
+        {
+          h: "Qué columnas lleva un kardex",
+          body: [
+            {
+              table: {
+                head: ["Grupo", "Columnas", "Qué se anota"],
+                rows: [
+                  ["Movimiento", "Fecha, documento, detalle", "Cuándo fue y con qué factura, boleta o guía"],
+                  ["Entradas", "Cantidad, costo unitario, total", "Lo que entra: compras y devoluciones de clientes"],
+                  ["Salidas", "Cantidad, costo unitario, total", "Lo que sale: ventas, mermas y consumo interno"],
+                  ["Saldo", "Cantidad, costo promedio, total", "Lo que queda después del movimiento"],
+                ],
+              },
+            },
+          ],
+        },
+        {
+          h: "Un ejemplo paso a paso",
+          body: [
+            "Es el ejemplo que viene cargado en la plantilla: un producto que parte con 100 unidades.",
+            {
+              table: {
+                head: ["Fecha", "Movimiento", "Entrada", "Salida", "Saldo", "Costo promedio", "Valor del saldo"],
+                rows: [
+                  ["01-10", "Saldo inicial", "100 a $1.000", "", "100", "$1.000", "$100.000"],
+                  ["05-10", "Compra", "50 a $1.200", "", "150", "$1.066,67", "$160.000"],
+                  ["12-10", "Venta", "", "80", "70", "$1.066,67", "$74.667"],
+                ],
+              },
+            },
+            {
+              steps: [
+                "Partes con 100 unidades que te costaron $1.000 cada una: el saldo vale $100.000.",
+                "Compras 50 a $1.200. Ahora tienes 150 unidades que valen $160.000, así que cada una vale en promedio $1.066,67.",
+                "Vendes 80. Salen al costo promedio, $1.066,67 cada una, o sea $85.333. Quedan 70 unidades que valen $74.667.",
+              ],
+            },
+          ],
+        },
+        {
+          h: "Las fórmulas",
+          body: [
+            "En la plantilla ya vienen escritas. Si prefieres armar tu propio kardex, esta es la lógica de cada fila:",
+            [
+              "Saldo en unidades = saldo anterior + entrada − salida.",
+              "Total de la entrada = cantidad × costo unitario.",
+              "Costo de la salida = costo promedio del saldo anterior.",
+              "Valor del saldo = valor anterior + total de la entrada − total de la salida.",
+              "Costo promedio = valor del saldo ÷ unidades del saldo.",
+            ],
+            "Con las columnas en el mismo orden de la plantilla (entradas en D, E y F; salidas en G, H e I; saldo en J, K y L), las fórmulas de la fila 8 son:",
+            {
+              formulas: [
+                { cell: "F8", what: "Total de la entrada", formula: "=D8*E8" },
+                { cell: "H8", what: "Costo de la salida", formula: "=K7" },
+                { cell: "I8", what: "Total de la salida", formula: "=G8*H8" },
+                { cell: "J8", what: "Saldo en unidades", formula: "=J7+D8-G8" },
+                { cell: "L8", what: "Valor del saldo", formula: "=L7+F8-I8" },
+                { cell: "K8", what: "Costo promedio", formula: "=SI(J8=0;0;L8/J8)" },
+              ],
+            },
+            "En la primera fila no hay saldo anterior: el saldo es la entrada inicial. De ahí en adelante, se copian hacia abajo.",
+          ],
+        },
+        {
+          h: "Promedio ponderado o PEPS",
+          body: [
+            "Son las dos formas más usadas de valorizar lo que sale.",
+            [
+              "Costo promedio ponderado: todas las unidades del saldo valen lo mismo, el promedio. Es el más simple de llevar en Excel y el que usa la plantilla.",
+              "PEPS (primero en entrar, primero en salir; FIFO en inglés): lo que sale se valoriza al costo de la compra más antigua que queda. Refleja mejor los costos cuando cambian mucho, pero obliga a llevar la cuenta de cada compra por separado.",
+            ],
+            "Cualquiera sea el método, lo importante es usar siempre el mismo. Para efectos tributarios, confirma con tu contador cuál corresponde a tu empresa.",
+          ],
+        },
+        {
+          h: "Errores comunes",
+          body: [
+            [
+              "Anotar los movimientos días después: el kardex solo sirve si está al día.",
+              "Mezclar varios productos en la misma hoja: el saldo y el costo promedio dejan de tener sentido.",
+              "Escribir encima de las fórmulas del saldo para que un número «cuadre»: si no cuadra, falta anotar un movimiento.",
+              "No compararlo nunca con un conteo físico: el kardex dice lo que debería haber, y el conteo, lo que hay.",
+              "Registrar una salida mayor que el saldo: la plantilla lo avisa con «Saldo negativo».",
+            ],
+            { see: ["counts"] },
+          ],
+        },
+        {
+          h: "Lo que el kardex no te dice",
+          body: [
+            "El kardex responde cuánto tienes y cuánto vale. No responde qué hay que reponer esta semana, cuánto pedir ni qué productos llevan meses sin venderse.",
+            "Para eso está MiKardex: subes un Excel con tus productos, su stock y lo vendido, y ves qué se agota primero, la lista de compra y el stock sin movimiento. La prueba es gratis y sin registro.",
+            { see: ["reorder", "analysis"] },
+          ],
+        },
+      ],
+      faqTitle: "Preguntas frecuentes",
+      faq: [
+        {
+          q: "¿Qué es un kardex?",
+          a: "Es la ficha de un producto donde se anota cada entrada y cada salida, con el saldo después de cada movimiento. El nombre viene de una marca de tarjeteros que se usaban para llevar estas fichas en papel.",
+        },
+        { q: "¿Sirve para varios productos?", a: "Sí, con una hoja por producto: copias la hoja Kardex y cambias el nombre del producto." },
+        {
+          q: "¿Kardex e inventario son lo mismo?",
+          a: "No. El inventario es la lista de lo que tienes en un momento. El kardex es la historia de cómo llegaste ahí, movimiento por movimiento.",
+        },
+        { q: "¿Necesito macros o un Excel especial?", a: "No. Es un archivo .xlsx normal, con fórmulas básicas." },
+      ],
+      bottom: { h: "¿Ya tienes tu inventario en Excel?", p: "Sube el archivo y mira qué reponer y qué no se vende, o prueba primero con los datos de ejemplo.", link: "" },
     },
   },
 };
