@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Upload, Loader2, ShieldCheck } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
+import { ExampleTable, FileGuide } from "./ui";
 import { pickSheet } from "./importLogic";
 import { COUNT_FIELDS, DAY, guessCountMapping, validateCountMapping, buildCountLines, dateOrderInfo } from "./countLogic";
 import { readFileSheets } from "./fileReaders";
@@ -153,7 +154,15 @@ export default function CountImportModal({ lang, t, onClose, onImported }) {
             </p>
           )}
 
-          <p style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.55, margin: "14px 0 12px" }}>{t("countImportNeeds")}</p>
+          <FileGuide title={t("countGuideTitle")} testId="count-guide">
+            <div>{t("countGuideA")}</div>
+            <ExampleTable cols={t("countGuideACols")} rows={t("countGuideARows")} />
+            <div>{t("countGuideB")}</div>
+            <ExampleTable cols={t("countGuideBCols")} rows={t("countGuideBRows")} />
+            <div style={{ color: COLORS.inkMuted, fontSize: 13 }}>{t("countGuideMore")}</div>
+            <div style={{ color: COLORS.inkMuted, fontSize: 13, marginTop: 4 }}>{t("countGuideNo")}</div>
+          </FileGuide>
+          <div style={{ height: 12 }} />
           <p style={{ display: "flex", gap: 8, fontSize: 13, color: COLORS.ink, lineHeight: 1.5, margin: 0 }}>
             <ShieldCheck size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 2 }} />
             {t("countsPrivacy")}

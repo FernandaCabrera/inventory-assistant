@@ -1,12 +1,15 @@
-import { useRef, useState } from "react";
-import { Upload, Download, Loader2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Upload, Download, Loader2, AlertTriangle } from "lucide-react";
 import Modal from "./Modal";
 import { COLORS, FONT_MONO, monoLabel, primaryButton, secondaryButton, textInput } from "./theme";
-import { FIELDS, pickSheet, validateMapping, buildInventory } from "./importLogic";
+import { FIELDS, pickSheet, validateMapping, buildInventory, reviewImport } from "./importLogic";
+import { formatNumber } from "./i18n";
+import { ExampleTable, FileGuide } from "./ui";
 import { readFileSheets, downloadTemplate } from "./fileReaders";
 import { DEFAULT_SALES_PERIOD_DAYS, DEFAULT_LEAD_TIME_DAYS, MAX_ROWS } from "./config";
 
-export default function ImportModal({ lang, t, onClose, onImported }) {
+// uploadsLeft: free uploads still available, or null for a paid plan (no limit to show)
+export default function ImportModal({ lang, t, uploadsLeft = null, uploadsMax = 0, onClose, onImported }) {
   const [phase, setPhase] = useState("pick"); // pick | reading | map
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
@@ -51,20 +54,28 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
     setError("");
   }
 
+  const problems = mapping ? validateMapping(mapping) : [];
+
+  // What the file gives with the columns chosen so far. It is worked out again on every change,
+  // so the preview and the warnings always match what "Analyze" would load.
+  const built = useMemo(() => {
+    if (!table || !mapping || validateMapping(mapping).length > 0) return null;
+    return buildInventory(table, mapping, { salesPeriodDays: period, defaultLeadTime: lead, defaultWarehouse: t("defaultWarehouse") });
+  }, [table, mapping, period, lead, t]);
+  const review = useMemo(() => (built && built.items.length > 0 ? reviewImport(table, mapping, built) : null), [built, table, mapping]);
+  const warnings = review ? review.warnings : [];
+  // The columns are there but no row gives a product with a stock number: said at once, not after a click
+  const nothingRead = built !== null && built.items.length === 0;
+
   function analyze() {
-    const { items, report } = buildInventory(table, mapping, {
-      salesPeriodDays: period,
-      defaultLeadTime: lead,
-      defaultWarehouse: t("defaultWarehouse"),
-    });
+    if (!built) return;
+    const { items, report } = built;
     if (items.length === 0) {
       setError(t("errNoItems"));
       return;
     }
     onImported({ items, fileName, report });
   }
-
-  const problems = mapping ? validateMapping(mapping) : [];
 
   return (
     <Modal title={phase === "map" ? t("importCheck") : t("importTitle")} onClose={onClose} closeLabel={t("close")} width={600}>
@@ -121,12 +132,21 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
             </p>
           )}
 
-          <p style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.55, margin: "14px 0 12px" }}>
-            {t("importNeeds")}
-          </p>
-          <button onClick={() => downloadTemplate(lang)} style={{ ...secondaryButton, padding: "9px 14px", fontSize: 11.5 }}>
-            <Download size={13} /> {t("importTemplate")}
-          </button>
+          {uploadsLeft !== null && (
+            <p data-testid="uploads-left" style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLORS.ink, letterSpacing: "0.03em", margin: "12px 0 0" }}>
+              {t("uploadsLeft", { left: uploadsLeft, max: uploadsMax })}
+            </p>
+          )}
+
+          <FileGuide title={t("importGuideTitle")} testId="import-guide">
+            <div>{t("importGuideBody")}</div>
+            <ExampleTable cols={t("importGuideCols")} rows={t("importGuideRows")} />
+            <div style={{ color: COLORS.inkMuted, fontSize: 13 }}>{t("importGuideOptional")}</div>
+            <div style={{ color: COLORS.inkMuted, fontSize: 13, marginTop: 4 }}>{t("importGuideNo")}</div>
+            <button onClick={() => downloadTemplate(lang)} style={{ ...secondaryButton, padding: "8px 13px", fontSize: 11.5, margin: "10px 0 4px" }}>
+              <Download size={13} /> {t("importTemplate")}
+            </button>
+          </FileGuide>
           <p style={{ fontSize: 12.5, color: COLORS.inkMuted, lineHeight: 1.55, margin: "16px 0 0" }}>{t("privacy")}</p>
         </div>
       )}
@@ -245,12 +265,51 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
           </div>
           )}
 
-          {(problems.length > 0 || error) && (
+          {(problems.length > 0 || nothingRead || error) && (
             <div role="alert" style={{ color: COLORS.critical, fontSize: 13.5, marginTop: 12, lineHeight: 1.5 }}>
+              {problems.length > 0 && <div style={{ fontWeight: 600 }}>{t("importMissingLead")}</div>}
               {problems.map((p) => (
                 <div key={p}>{t(p)}</div>
               ))}
-              {error && <div>{error}</div>}
+              {problems.length > 0 && <div style={{ color: COLORS.inkMuted, marginTop: 4 }}>{t("importMissingHelp")}</div>}
+              {nothingRead && <div>{t("errNoItems")}</div>}
+              {error && !nothingRead && <div>{error}</div>}
+            </div>
+          )}
+
+          {/* What was understood from the file, so a wrong column is seen before the analysis */}
+          {review && (
+            <div data-testid="import-preview" style={{ marginTop: 16 }}>
+              <div style={{ ...monoLabel, color: COLORS.ink, marginBottom: 2 }}>{t("importPreviewTitle")}</div>
+              <ExampleTable
+                cols={[t("importColProduct"), t("importColStock"), t("importColUsage"), t("importColReorder")]}
+                rows={review.preview.map((item) => [
+                  item.name,
+                  formatNumber(lang, item.stock, 2),
+                  item.avg_daily_usage === null || item.avg_daily_usage === undefined ? "—" : formatNumber(lang, item.avg_daily_usage, 2),
+                  item.reorder_point === null || item.reorder_point === undefined ? "—" : formatNumber(lang, item.reorder_point, 2),
+                ])}
+              />
+              {review.total > review.preview.length && (
+                <div style={{ fontSize: 12.5, color: COLORS.inkMuted }}>{t("importPreviewMore", { n: formatNumber(lang, review.total - review.preview.length) })}</div>
+              )}
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div
+              role="alert"
+              data-testid="import-warnings"
+              style={{ marginTop: 14, padding: "11px 13px", background: COLORS.lowBg, border: `1px solid ${COLORS.low}`, borderRadius: 8, fontSize: 13.5, lineHeight: 1.5, color: COLORS.ink }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 600, marginBottom: 4 }}>
+                <AlertTriangle size={15} color={COLORS.low} /> {t("warnTitle")}
+              </div>
+              {warnings.map((w) => (
+                <div key={w.code} style={{ marginTop: 3 }}>
+                  {t(w.code, w)}
+                </div>
+              ))}
             </div>
           )}
           {table.rows.length > MAX_ROWS && (
@@ -262,10 +321,10 @@ export default function ImportModal({ lang, t, onClose, onImported }) {
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
             <button
               onClick={analyze}
-              disabled={problems.length > 0}
-              style={{ ...primaryButton, opacity: problems.length > 0 ? 0.45 : 1, cursor: problems.length > 0 ? "default" : "pointer" }}
+              disabled={problems.length > 0 || nothingRead}
+              style={{ ...(warnings.length > 0 ? secondaryButton : primaryButton), opacity: problems.length > 0 || nothingRead ? 0.45 : 1, cursor: problems.length > 0 || nothingRead ? "default" : "pointer" }}
             >
-              {t("importAnalyze")}
+              {warnings.length > 0 ? t("importAnalyzeAnyway") : t("importAnalyze")}
             </button>
             <button
               onClick={() => {

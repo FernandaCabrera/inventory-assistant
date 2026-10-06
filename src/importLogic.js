@@ -63,7 +63,12 @@ const LOOSE = [
     /(order qty|order quantity|\bmoq\b|pedido minimo|compra minima|min(imo|imum)? (order|purchase|compra|pedido)|reorder (qty|quantity))/,
   ],
   ["lead_time_days", /(lead|reposicion|entrega|plazo|delivery)/, null],
-  ["sales", /(vend|venta|sales|sold|salida|consumo|demand)/, /(precio|price|monto|amount|valor|revenue|ingreso|neto|bruto)/],
+  [
+    "sales",
+    /(vend|venta|sales|sold|salida|consumo|demand)/,
+    // money, and the columns of a sales record (who sold, when, which document), are not units sold
+    /(precio|price|monto|amount|valor|revenue|ingreso|neto|bruto|vendedor|vendor|seller|salesperson|sales (rep|person|order|channel)|fecha|date|canal|punto de venta|\b(orden|nota|numero|n|tipo|documento) de venta)/,
+  ],
   ["unit_cost", /(costo|cost|precio (de )?(compra|costo)|purchase price)/, /total/],
   ["warehouse", /(bodega|almacen|sucursal|warehouse|location|ubicacion|tienda|store)/, null],
   ["sku", /(sku|codigo|code|\bcod\b|\bid\b|referencia|\bref\b|part number|barcode)/, null],
@@ -107,7 +112,15 @@ export function guessMapping(headers) {
   return mapping;
 }
 
-// Accepts 1234.5, "1.234,5", "1,234.5", "$ 1.500", "(12)", "12 un", and negatives written "-3", "−3" or "3-" (SAP)
+// A currency mark in front of an amount ("$ 1.500", "USD 12", "S/ 30")
+const CURRENCY = /^(?:[$€£]|us\$|u\$s|r\$|s\/\.?|usd|clp|cad|nzd|aud|eur|mxn|pen|cop|ars|gbp|brl|uf)?$/i;
+// What may follow the number: a short unit ("un", "kg", "cajas", "%") or a currency code
+const UNIT = /^[a-záéíóúñü%°./²³$€£]{0,15}$/i;
+
+// Accepts 1234.5, "1.234,5", "1,234.5", "1 234", "$ 1.500", "(12)", "12 un", and negatives written
+// "-3", "−3" or "3-" (SAP). A cell that is text with a number inside ("Café grano 1 kg"), a date
+// ("2026-09-01") or a code ("A-12-3") is not a number: it answers null, so a column of names or
+// dates chosen by mistake is not read as stock.
 export function parseNumber(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (value === null || value === undefined) return null;
@@ -116,28 +129,49 @@ export function parseNumber(value) {
   let negative = false;
   if (/^\(.*\)$/.test(s)) {
     negative = true;
-    s = s.slice(1, -1);
+    s = s.slice(1, -1).trim();
   }
-  s = s.replace(/[\u2212\u2012\u2013\u2014]/g, "-").replace(/[^0-9.,-]/g, "");
-  if (s.startsWith("-") || s.endsWith("-")) {
-    negative = true;
-  }
-  s = s.replace(/-/g, "");
-  if (!/[0-9]/.test(s)) return null;
+  s = s.replace(/[\u2212\u2012\u2013\u2014]/g, "-");
 
-  const lastDot = s.lastIndexOf(".");
-  const lastComma = s.lastIndexOf(",");
+  const first = s.search(/[0-9]/);
+  if (first < 0) return null;
+  let last = s.length - 1;
+  while (!/[0-9]/.test(s[last])) last -= 1;
+
+  // before the number: at most a sign and a currency mark
+  const before = s.slice(0, first).replace(/\s/g, "");
+  const sign = before.replace(/[^-+]/g, "");
+  if (sign.length > 1 || !CURRENCY.test(before.replace(/[-+]/g, ""))) return null;
+  if (sign === "-") negative = true;
+
+  // after the number: at most a trailing minus and a unit
+  let after = s.slice(last + 1).trim();
+  if (after.startsWith(".-")) {
+    after = after.slice(2).trim(); // "$12.990.-" is how prices are closed in Chile, not a negative
+  } else if (after.startsWith("-")) {
+    negative = true;
+    after = after.slice(1).trim();
+  }
+  if (!UNIT.test(after.replace(/\s/g, ""))) return null;
+
+  // the number itself: digits with "." and ",", or groups of three separated by spaces
+  let core = s.slice(first, last + 1);
+  if (/^\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?$/.test(core)) core = core.replace(/[ \u00a0]/g, "");
+  if (!/^[0-9.,]+$/.test(core)) return null;
+
+  const lastDot = core.lastIndexOf(".");
+  const lastComma = core.lastIndexOf(",");
   if (lastDot >= 0 && lastComma >= 0) {
     // the later one is the decimal separator
-    if (lastComma > lastDot) s = s.replace(/\./g, "").replace(",", ".");
-    else s = s.replace(/,/g, "");
+    if (lastComma > lastDot) core = core.replace(/\./g, "").replace(",", ".");
+    else core = core.replace(/,/g, "");
   } else if (lastComma >= 0) {
-    if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, "");
-    else s = s.replace(",", ".");
+    if (/^\d{1,3}(,\d{3})+$/.test(core)) core = core.replace(/,/g, "");
+    else core = core.replace(",", ".");
   } else if (lastDot >= 0) {
-    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+    if (/^\d{1,3}(\.\d{3})+$/.test(core)) core = core.replace(/\./g, "");
   }
-  const n = Number(s);
+  const n = Number(core);
   if (!Number.isFinite(n)) return null;
   return negative ? -n : n;
 }
@@ -383,4 +417,54 @@ export function buildInventory(table, mapping, settings) {
   }
 
   return { items, report };
+}
+
+// ---- Does this look like an inventory? ----
+
+// Column names that belong to a record of sales or documents, not to a list of stock
+const TRANSACTION_HEADERS =
+  /(cliente|customer|factura|invoice|boleta|folio|\brut\b|vendedor|salesperson|sales rep|numero de (documento|pedido|orden|venta)|n de (documento|pedido|orden|venta)|order (id|number|no)\b|document (number|no)\b|fecha de (venta|emision|factura|pedido)|invoice date|sale date|order date)/;
+
+// Looks at what was read from the file and says what does not look like an inventory, so the
+// visitor is told before the analysis instead of getting figures that mean nothing.
+// built: what buildInventory returned. Returns { preview, total, warnings }, where each warning
+// is { code, ...numbers for the message }.
+export function reviewImport(table, mapping, built) {
+  const { items, report } = built;
+  const warnings = [];
+
+  // The same product on many rows: an inventory has one row per product (and warehouse).
+  // Repeats are what a list of sales or stock movements looks like.
+  const byCode = mapping.sku !== null && mapping.sku !== undefined;
+  const seen = new Set();
+  let repeated = 0;
+  items.forEach((item) => {
+    const key = `${String(byCode ? item.sku : item.name).trim().toLowerCase()}|${String(item.warehouse).trim().toLowerCase()}`;
+    if (seen.has(key)) repeated += 1;
+    else seen.add(key);
+  });
+  if (items.length >= 6 && repeated / items.length >= 0.3) {
+    warnings.push({ code: "warnRepeated", n: repeated, total: items.length });
+  }
+
+  // Columns of customers, invoices or sale dates that the inventory does not use
+  const used = new Set(Object.values(mapping).filter((v) => v !== null && v !== undefined));
+  const foreign = table.headers.filter((header, i) => !used.has(i) && TRANSACTION_HEADERS.test(normalizeHeader(header)));
+  if (foreign.length > 0) {
+    warnings.push({ code: "warnTransactions", cols: foreign.slice(0, 3).join(", ") });
+  }
+
+  // The stock column has no number on many rows: probably the wrong column
+  const withStockCell = report.read + report.skippedNoStock;
+  if (report.skippedNoStock >= 3 && report.skippedNoStock / withStockCell >= 0.3) {
+    warnings.push({ code: "warnUnreadStock", n: report.skippedNoStock, total: withStockCell });
+  }
+
+  // A sales column was chosen but nothing sold: nothing can be said about what to order
+  const hasDemandColumn = (mapping.sales !== null && mapping.sales !== undefined) || (mapping.avg_daily_usage !== null && mapping.avg_daily_usage !== undefined);
+  if (hasDemandColumn && items.length >= 3 && items.every((item) => !(item.avg_daily_usage > 0))) {
+    warnings.push({ code: "warnNoSales" });
+  }
+
+  return { preview: items.slice(0, 3), total: items.length, warnings };
 }

@@ -45,7 +45,7 @@ import PlanModal from "./PlanModal";
 import { cleanCode } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
-import { HomeSections, Footer, PrivacyModal } from "./HomeSections";
+import { HowItWorks, Plans, AboutAndData, Footer, PrivacyModal } from "./HomeSections";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import CountImportModal from "./CountImportModal";
@@ -233,10 +233,10 @@ function Dashboard({ items, lang, t, children }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <ChartCard title={t("chartStatus")}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={statusData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+            <BarChart data={statusData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} vertical={false} />
               <XAxis dataKey="name" tick={axisTick} axisLine={{ stroke: COLORS.line }} tickLine={false} interval={0} />
-              <YAxis allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} width={34} />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} width={44} />
               <Tooltip />
               <Bar dataKey="value" name={t("tooltipSkus")} radius={[4, 4, 0, 0]} maxBarSize={60}>
                 {statusData.map((entry, i) => (
@@ -494,16 +494,24 @@ function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false 
         boxSizing: "border-box",
       }}
     >
+      <div style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.inkMuted, marginBottom: 8 }}>
+        {t("countsEyebrow")}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
         <ClipboardCheck size={20} color={COLORS.ink} />
         <h2 style={{ fontFamily: FONT_HEAD, fontSize: 26, fontWeight: 600, textTransform: "uppercase", color: COLORS.ink, margin: 0, letterSpacing: "0.01em" }}>
           {t("countsTitle")}
         </h2>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#FFFFFF", background: COLORS.critical, borderRadius: 4, padding: "3px 7px" }}>
-          {t("countsTag")}
-        </span>
       </div>
-      <p style={{ fontSize: 15, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px", maxWidth: 760 }}>{t("countsBody")}</p>
+      <p style={{ fontSize: 15, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 14px", maxWidth: 760 }}>{t("countsBody")}</p>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+        {t("countsFacts").map((fact) => (
+          <div key={fact.h} style={{ flex: "1 1 220px", borderTop: `2px solid ${COLORS.ink}`, paddingTop: 9 }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.ink, marginBottom: 4 }}>{fact.h}</div>
+            <div style={{ fontSize: 13.5, color: COLORS.inkMuted, lineHeight: 1.5 }}>{fact.p}</div>
+          </div>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         {counts && (
           <button onClick={onContinue} data-testid="counts-continue" style={{ ...primaryButton, padding: "12px 20px", maxWidth: "100%" }}>
@@ -526,7 +534,7 @@ function CountsIntro({ t, counts, onUpload, onSample, onContinue, flush = false 
   );
 }
 
-function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue }) {
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue }) {
   return (
     <div
       style={{
@@ -649,9 +657,11 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, current
       )}
       </div>
 
+      {/* First the main tool is explained; the cycle count report comes after it, as a second tool */}
+      <HowItWorks t={t} />
       <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} />
-
-      <HomeSections t={t} onPrivacy={onPrivacy} />
+      <Plans t={t} lang={lang} onPlan={onPlan} />
+      <AboutAndData t={t} onPrivacy={onPrivacy} />
       <Footer t={t} onPrivacy={onPrivacy} />
     </div>
   );
@@ -1158,7 +1168,16 @@ export default function InventoryAssistant() {
 
   const modals = (
     <>
-      {showImport && <ImportModal lang={lang} t={t} onClose={closeImport} onImported={handleImported} />}
+      {showImport && (
+        <ImportModal
+          lang={lang}
+          t={t}
+          uploadsLeft={paid ? null : Math.max(0, FREE_UPLOADS - uploadsUsed)}
+          uploadsMax={FREE_UPLOADS}
+          onClose={closeImport}
+          onImported={handleImported}
+        />
+      )}
       {showCountImport && <CountImportModal lang={lang} t={t} onClose={closeCountImport} onImported={handleCountsImported} />}
       {upgradeReason !== null && (
         <UpgradeModal
@@ -1264,6 +1283,7 @@ export default function InventoryAssistant() {
           onUpload={requestUpload}
           onSample={loadSampleData}
           onPrivacy={openPrivacy}
+          onPlan={() => setUpgradeReason("")}
           current={continueTarget()}
           onContinue={continueToData}
           onClear={clearData}
