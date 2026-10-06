@@ -47,7 +47,7 @@ test("sample data opens the assistant with the dashboard unlocked", () => {
   expect(screen.queryByText("The dashboard is part of the paid plan")).not.toBeInTheDocument();
 });
 
-test("a stored upload on the free plan shows the dashboard locked", () => {
+test("a stored upload on the free plan shows the dashboard locked", async () => {
   window.localStorage.setItem(
     "mikardex.dataset",
     JSON.stringify({
@@ -72,8 +72,8 @@ test("a stored upload on the free plan shows the dashboard locked", () => {
   fireEvent.click(screen.getByText("Replace data"));
   expect(screen.getByText(/The free plan includes 3 uploads of your Excel/)).toBeInTheDocument();
   expect(screen.getByTestId("plan-price")).toHaveTextContent("Price: USD 12 per month");
-  // no Stripe link set: the plan is requested by email, there is no pay button
-  expect(screen.getByText("Request the plan")).toBeInTheDocument();
+  // the server has no PayPal set up: the plan is requested by email, there is no pay button
+  expect(await screen.findByText("Request the plan")).toBeInTheDocument();
   expect(screen.queryByTestId("plan-pay")).not.toBeInTheDocument();
 });
 
@@ -135,7 +135,7 @@ test("sample data: summary cards and the full order list", () => {
   expect(screen.getByText(/^Total · Products: \d+$/)).toBeInTheDocument();
 });
 
-test("own file on the free plan: three rows of the order list, the rest behind the plan", () => {
+test("own file on the free plan: three rows of the order list, the rest behind the plan", async () => {
   const items = Array.from({ length: 6 }, (_, i) => ({
     sku: `A${i}`, name: `Product ${i}`, warehouse: "Main", stock: i, reorder_point: 30, lead_time_days: 7, avg_daily_usage: 3, unit_cost: 10,
   }));
@@ -155,6 +155,7 @@ test("own file on the free plan: three rows of the order list, the rest behind t
 
   fireEvent.click(screen.getByText("Unlock the full list"));
   expect(screen.getByText("The full order list and its Excel download are part of the plan.")).toBeInTheDocument();
+  expect(await screen.findByText("Request the plan")).toBeInTheDocument();
 });
 
 test("Home goes back to the first page and offers the way back to the loaded file", () => {

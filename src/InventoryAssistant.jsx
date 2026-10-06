@@ -42,7 +42,7 @@ import { load, save, remove } from "./storage";
 import ImportModal from "./ImportModal";
 import UpgradeModal from "./UpgradeModal";
 import PlanModal from "./PlanModal";
-import { cleanCode, returnedSessionId, clearReturnedSession } from "./plan";
+import { cleanCode } from "./plan";
 import OrderList from "./OrderList";
 import SummaryCards from "./SummaryCards";
 import { HomeSections, Footer, PrivacyModal } from "./HomeSections";
@@ -703,10 +703,11 @@ export default function InventoryAssistant() {
   const [exportingIndex, setExportingIndex] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState(null); // null = closed
-  // Back from paying on Stripe: the address carries the session to confirm with the server.
-  const paymentSession = useRef(returnedSessionId());
+  // A PayPal subscription that was approved but not confirmed with the server yet. It is kept in
+  // the browser, so a closed tab or a sleeping server does not lose a payment.
+  const pendingPayment = useRef(cleanCode(load("pendingSubscription", "")));
   // The customer's own plan window: null = closed, or "checking" | "active" | "failed" | "error"
-  const [planWindow, setPlanWindow] = useState(() => (paymentSession.current ? "checking" : null));
+  const [planWindow, setPlanWindow] = useState(() => (pendingPayment.current ? "checking" : null));
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [coverDays, setCoverDays] = useState(() => String(load("coverDays", ORDER_COVER_DAYS)));
   // Cycle count report. Kept only while the page is open: it is never saved or sent anywhere.
@@ -752,7 +753,7 @@ export default function InventoryAssistant() {
       .then((data) => {
         if (cancelled || !data || data.valid !== false) return;
         // Only the code that was checked is dropped: a new one may have arrived meanwhile
-        // (someone who subscribes again comes back from Stripe with a new code).
+        // (someone who subscribes again gets a new code).
         if (load("accessCode", "") === accessCode) remove("accessCode");
         setAccessCode((current) => (current === accessCode ? "" : current));
       })
@@ -920,36 +921,44 @@ export default function InventoryAssistant() {
     save("accessCode", clean);
   }
 
-  // Asks the server whether the Stripe payment went through; if it did, the answer is the
+  // Asks the server whether the PayPal subscription is active; if it is, its id is the
   // customer's access code. The server may be asleep, so this can take a while and can be retried.
   async function confirmPayment() {
-    const sessionId = paymentSession.current;
-    if (!sessionId) return;
+    const subscriptionId = pendingPayment.current;
+    if (!subscriptionId) return;
     setPlanWindow("checking");
     try {
-      const res = await fetch(`${API_URL}/api/stripe/activate`, {
+      const res = await fetch(`${API_URL}/api/paypal/activate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ subscriptionId }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.valid && typeof data.code === "string" && data.code !== "") {
         handleActivated(data.code);
-        setUpgradeReason(null);
         setPlanWindow("active");
       } else if (res.ok) {
-        setPlanWindow("failed"); // Stripe says this payment did not go through
+        setPlanWindow("failed"); // PayPal says this subscription is not paid
       } else {
-        setPlanWindow("error"); // server or Stripe unavailable: the session stays, to try again
+        setPlanWindow("error"); // server or PayPal unavailable: the subscription stays, to try again
         return;
       }
-      paymentSession.current = "";
-      clearReturnedSession();
+      pendingPayment.current = "";
+      remove("pendingSubscription");
     } catch (err) {
       setPlanWindow("error");
     }
   }
 
+  // PayPal's button reports an approved subscription
+  function handleSubscribed(subscriptionId) {
+    pendingPayment.current = cleanCode(subscriptionId);
+    save("pendingSubscription", pendingPayment.current);
+    setUpgradeReason(null);
+    confirmPayment();
+  }
+
+  // a subscription left unconfirmed on an earlier visit is confirmed now
   useEffect(() => {
     confirmPayment();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1158,6 +1167,7 @@ export default function InventoryAssistant() {
           reason={upgradeReason}
           apiUrl={API_URL}
           skuCount={isSample ? 0 : summary.total}
+          onSubscribed={handleSubscribed}
           onClose={closeUpgrade}
           onActivated={handleActivated}
         />
