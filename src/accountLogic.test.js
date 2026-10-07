@@ -5,13 +5,35 @@ import { accountsWanted, accountHasPlan, figuresOf, changesBetween, withPrevious
 import { ACCOUNTS_ON } from "./config";
 import { sampleInventory } from "./data/sample";
 
+// The setting in src/config.js, which these tests switch on and off
+let mockAccountsOn = false;
+jest.mock("./config", () => ({
+  ...jest.requireActual("./config"),
+  get ACCOUNTS_ON() {
+    return mockAccountsOn;
+  },
+}));
+
 beforeEach(() => {
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
+  mockAccountsOn = false;
 });
 
-test("accounts are off until the setting says so, and can be tried in one browser with ?cuentas=1", () => {
-  expect(ACCOUNTS_ON).toBe(false); // the site is published with accounts off until the server is ready
+test("the site is published with accounts on", () => {
+  expect(jest.requireActual("./config").ACCOUNTS_ON).toBe(true);
+});
+
+test("with the setting on, accounts are offered to every visitor", () => {
+  mockAccountsOn = true;
+  expect(ACCOUNTS_ON).toBe(true);
+  expect(accountsWanted()).toBe(true);
+  // the mark in the address is for trying them while the setting is off: it cannot switch them off
+  window.history.replaceState(null, "", "/?cuentas=0");
+  expect(accountsWanted()).toBe(true);
+});
+
+test("with the setting off, accounts can be tried in one browser with ?cuentas=1", () => {
   expect(accountsWanted()).toBe(false);
 
   window.history.replaceState(null, "", "/?cuentas=1");

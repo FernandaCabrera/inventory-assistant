@@ -8,9 +8,9 @@ export const FREE_QUESTIONS = 3; // questions to the assistant without a plan
 // Accounts. true = uploading one's own file asks to sign in with an email and a code (the sample
 // stays open), the free uploads are counted per account and each analysis joins a history.
 // It only takes effect when the server can run accounts (a database and a sender address: see
-// server/.env.example); until then the page works as with false. To try it on the live site
-// before switching it on for everyone, open the site once with ?cuentas=1 at the end of the address.
-export const ACCOUNTS_ON = false;
+// server/.env.example); if it cannot, the page works as with false. With false, the accounts can
+// still be tried in one browser by opening the site once with ?cuentas=1 at the end of the address.
+export const ACCOUNTS_ON = true;
 
 // Show the "View prompt" button that lets visitors read the AI's instructions.
 // Off for the public launch. To use it in a demo, set this to true AND start the

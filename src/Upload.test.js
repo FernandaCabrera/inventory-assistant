@@ -5,6 +5,9 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { TextEncoder, TextDecoder } from "util";
 import App from "./App";
 
+// These tests are about the page without the visitor's account, as it works when the server cannot
+// run accounts. The page with accounts is tested in Account.test.js.
+jest.mock("./config", () => ({ ...jest.requireActual("./config"), ACCOUNTS_ON: false }));
 jest.mock("recharts", () => {
   const Stub = ({ children }) => <div>{children}</div>;
   return {
