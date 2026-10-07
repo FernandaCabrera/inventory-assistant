@@ -97,7 +97,7 @@ cd server && npm test    # the PayPal logic and the accounts on the server
 |---|---|---|
 | Free uploads per browser (the same Excel loaded again counts) | `src/config.js` → `FREE_UPLOADS` | 3 |
 | Free uploads per account, when accounts are on (keep both equal) | server env `FREE_UPLOADS` | 3 |
-| Ask for an account to upload a file | `src/config.js` → `ACCOUNTS_ON`, and the server env under [Accounts](#accounts) | off |
+| Ask for an account to upload a file | `src/config.js` → `ACCOUNTS_ON`, and the server env under [Accounts](#accounts) | on |
 | Free questions per browser | `src/config.js` → `FREE_QUESTIONS` | 3 |
 | Order list rows shown without a plan | `src/config.js` → `ORDER_FREE_ROWS` | 3 |
 | Days of sales a new order should cover | `src/config.js` → `ORDER_COVER_DAYS` (visitors can change it) | 30 |
@@ -157,7 +157,7 @@ To try it without real money, create a sandbox app and a sandbox plan (`sandbox.
 
 ## Accounts
 
-Off by default. When on, the sample data still opens without signing in, and uploading one's own file asks for an account: an email address and a 6-digit code sent to it, no password.
+On (`ACCOUNTS_ON` in `src/config.js`), and working only when the server is set up for it. The sample data still opens without signing in, and uploading one's own file asks for an account: an email address and a 6-digit code sent to it, no password.
 
 **What a visitor gets**
 

@@ -2,6 +2,9 @@ import { render, screen, fireEvent, act, within, waitFor } from "@testing-librar
 import App from "./App";
 import { exportLastCounted } from "./countExport";
 
+// These tests are about the page without the visitor's account, as it works when the server cannot
+// run accounts. The page with accounts is tested in Account.test.js.
+jest.mock("./config", () => ({ ...jest.requireActual("./config"), ACCOUNTS_ON: false }));
 jest.mock("recharts", () => {
   const Stub = ({ children }) => <div>{children}</div>;
   return {

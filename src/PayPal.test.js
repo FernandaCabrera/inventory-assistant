@@ -5,6 +5,9 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import App from "./App";
 import { PAYPAL_PLAN_ID } from "./config";
 
+// These tests are about the page without the visitor's account, as it works when the server cannot
+// run accounts. The page with accounts is tested in Account.test.js.
+jest.mock("./config", () => ({ ...jest.requireActual("./config"), ACCOUNTS_ON: false }));
 jest.mock("recharts", () => {
   const Stub = ({ children }) => <div>{children}</div>;
   return {
