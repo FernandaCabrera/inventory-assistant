@@ -18,7 +18,7 @@ const STRINGS = {
   en: {
     // What Google shows: the blue title of the result and the two lines under it.
     // Google cuts a title at about 60 characters, so it has to say everything before that.
-    seoTitle: "MiKardex · Excel inventory: what to reorder, what is not selling",
+    seoTitle: "MiKardex · Inventory diagnosis from your Excel file",
     seoDescription:
       "Upload your inventory spreadsheet and see what to reorder, what is about to run out and what is not selling. It also reads your SAP cycle count report. Free to start, no sign-up.",
     langHint: "View in English",
@@ -833,7 +833,7 @@ const STRINGS = {
   es: {
     // Lo que muestra Google: el título azul del resultado y las dos líneas de abajo.
     // Google corta el título cerca de los 60 caracteres: tiene que decirlo todo antes.
-    seoTitle: "MiKardex · Inventario en Excel: qué reponer y qué no se vende",
+    seoTitle: "MiKardex · Diagnóstico de inventario desde tu Excel",
     seoDescription:
       "Sube tu Excel de inventario y mira qué reponer, qué está por agotarse y qué no se vende. También lee tu reporte de conteos cíclicos de SAP. Gratis para empezar, sin registro.",
     langHint: "Ver en español",
