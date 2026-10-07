@@ -30,6 +30,7 @@ Built to demonstrate applied AI product thinking: structured LLM output, a live 
 - **Backend:** Node.js, Express
 - **AI:** Anthropic Claude API (Sonnet), structured JSON output (narrative + action items + relevant charts)
 - **Email:** Resend, node-cron for scheduled checks
+- **Accounts (optional):** a Postgres database in Supabase, reached over its REST interface with plain `fetch` (no extra package on the server)
 
 ## Architecture
 
@@ -41,8 +42,8 @@ React app (browser) — reads the spreadsheet, keeps it in the browser
       ▼
 Express backend  ──►  Claude API (Sonnet)
       │
-      ▼
-Resend (plan requests, email alerts)
+      ├──►  Resend (plan requests, email alerts, sign-in codes)
+      └──►  Supabase (accounts and the figures of each analysis; only when accounts are on)
 ```
 
 ## Running locally
@@ -87,7 +88,7 @@ The app opens at `http://localhost:3000`.
 
 ```bash
 npm test                 # the page
-cd server && npm test    # the PayPal logic on the server
+cd server && npm test    # the PayPal logic and the accounts on the server
 ```
 
 ## Plans, codes and limits
@@ -95,6 +96,8 @@ cd server && npm test    # the PayPal logic on the server
 | What | Where | Default |
 |---|---|---|
 | Free uploads per browser (the same Excel loaded again counts) | `src/config.js` → `FREE_UPLOADS` | 3 |
+| Free uploads per account, when accounts are on (keep both equal) | server env `FREE_UPLOADS` | 3 |
+| Ask for an account to upload a file | `src/config.js` → `ACCOUNTS_ON`, and the server env under [Accounts](#accounts) | off |
 | Free questions per browser | `src/config.js` → `FREE_QUESTIONS` | 3 |
 | Order list rows shown without a plan | `src/config.js` → `ORDER_FREE_ROWS` | 3 |
 | Days of sales a new order should cover | `src/config.js` → `ORDER_COVER_DAYS` (visitors can change it) | 30 |
@@ -114,6 +117,8 @@ cd server && npm test    # the PayPal logic on the server
 | Questions per day in total | server env `GLOBAL_DAILY_QUESTIONS` | 200 |
 | SKUs sent to the AI per question | server env `MAX_ITEMS_FOR_AI` | 800 |
 | Where plan requests are emailed | server env `LEADS_RECIPIENT` | `ALERT_RECIPIENT` |
+| Header the limits per network address read the visitor's address from | server env `CLIENT_IP_HEADER` (on Render: `cf-connecting-ip`) | `X-Forwarded-For` |
+| Sign-in codes emailed per day, in total | server env `SIGN_IN_EMAILS_PER_DAY` | 80 |
 | "View prompt" button (shows the AI instructions) | `src/config.js` → `SHOW_PROMPT` and server env `EXPOSE_SYSTEM_PROMPT=true` | off |
 
 To give a customer the plan by hand: add a code to `ACCESS_CODES`, restart the server, and send them the code. They enter it under "Free plan" in the app. Removing the code switches their plan off on their next visit.
@@ -122,7 +127,8 @@ What these limits are and are not:
 
 - The free limits (three uploads, three questions) and the dashboard lock are kept in the visitor's browser. They are a sales gate, not a security boundary: clearing browser data resets them. The server-side daily caps are what bound cost.
 - Daily counters are held in memory, so they reset at 00:00 UTC and whenever the server restarts.
-- There are no accounts and nothing about customers is stored on the server: PayPal is the record of who has paid.
+- The limits "per network address" trust the address the host's proxy reports. By default that is the first entry of `X-Forwarded-For`, which on some hosts (Render among them, by reports) a visitor can write themselves and so look like a new visitor on every request. Set `CLIENT_IP_HEADER` to a header only the host sets (`cf-connecting-ip` on Render); the log says once if a request arrives without it. The limits that protect cost or accounts do not depend on it: questions per day in total, codes emailed per day in total and per email, tries per code.
+- With accounts off (the default) nothing about customers is stored on the server: PayPal is the record of who has paid. With accounts on, see [Accounts](#accounts): the uploads are then counted per account on the server, so clearing the browser no longer resets them.
 - Also set a monthly spend limit in the Anthropic Console as a last line of defense.
 
 ## Subscriptions with PayPal
@@ -148,6 +154,51 @@ To try it without real money, create a sandbox app and a sandbox plan (`sandbox.
 - The server asks PayPal about an active code again after 10 minutes. If PayPal cannot be reached, customers already seen as active keep the plan for up to a day.
 - Customers with a PayPal account cancel from PayPal's automatic payments page (linked in "Plan active"). Customers who paid by card without an account write in, and the subscription is cancelled from the PayPal account.
 - The logic is in `server/paypal.js` (server), `src/plan.js`, `src/PayPalButton.jsx` and `src/PlanModal.jsx` (page).
+
+## Accounts
+
+Off by default. When on, the sample data still opens without signing in, and uploading one's own file asks for an account: an email address and a 6-digit code sent to it, no password.
+
+**What a visitor gets**
+
+- **My account** — their email, the state of the plan, how many free uploads are left, and the history of their analyses.
+- **History** — one line per file analysed: date, file name and the figures of that analysis (products, below reorder point, critical, out of stock, not selling or in excess, capital tied up, inventory value), each with its change from the analysis before.
+- **Since your previous analysis** — a card above the executive report, after each upload, with what went up and what went down.
+- **The plan on any device** — a PayPal subscription paid while signed in is tied to the account, so signing in on another computer brings the plan with it. The access code keeps working as before.
+
+**What is stored**
+
+The email, the language, whether they asked for news, the number of uploads used, the plan code, and for each analysis its date, file name and about twenty totals (`cleanFigures` in `server/accounts.js` is the full list). **Never the products**: SKUs, names, quantities per product and costs per product stay in the browser, as before. Sign-in codes and sessions are stored hashed. A visitor can delete the history or the whole account from "My account".
+
+**Set it up once**
+
+1. Create a project in [supabase.com](https://supabase.com) (the free plan is enough). In its **SQL Editor**, paste `server/accounts.sql` and run it. It creates four tables, lets the server's key use them (new Supabase projects give no access to new tables until it is granted) and turns row level security on with no policies, so no other key can read them.
+2. In Supabase → Project Settings → API, copy the **project URL** and the **secret key** (`sb_secret_...`, or the older `service_role` key). On the server host add them as `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. The secret key gives full access to the database: it goes only there, never in the page, the repo or a chat.
+3. In [resend.com](https://resend.com) → Domains, add the site's domain and create the DNS records it lists, until it says **Verified**. Then add `AUTH_SENDER` on the server host, for example `MiKardex <acceso@mikardex.cl>`. Without a verified domain Resend only delivers to the owner of the Resend account, so nobody else would get their code.
+4. Restart the server. Its log says `Accounts: on (Supabase)` and then `Accounts: the database answered`. `GET /api/health` now includes `"accounts": true`.
+5. Try it on the live site in one browser, before anyone else sees it: open the site with `?cuentas=1` at the end of the address (`?cuentas=0` undoes it). Sign in, upload a file twice, open "My account".
+6. When it works, set `ACCOUNTS_ON = true` in `src/config.js` and publish.
+
+**What happens when something is not ready**
+
+- The page asks for an account only when `ACCOUNTS_ON` is true **and** the server says it can handle accounts. If either is missing, the page works as it did without accounts and uploads are counted in the browser.
+- If the server or the database fails while someone is signing in, the window offers **Continue without an account**, and that upload is counted in the browser. Nobody is locked out of the tool because sign-in is down.
+- The server's first answer after sleeping can take a minute: the sign-in window waits and says so.
+- When the page is opened the server asks the database a small question (at most once an hour). A free Supabase project is paused after a week without use, so this keeps it awake while the site has visitors. If it was paused anyway, restore it from the Supabase dashboard; until then the page falls back to "Continue without an account".
+
+**Trying it on your own computer**, without Supabase or a mail domain: start the server with `ACCOUNTS_DEV=true` and open `http://localhost:3000/?cuentas=1`. Accounts are kept in memory (gone on restart) and each code is printed in the server's log. Never set it on the live server.
+
+**Limits and details**
+
+- A code lasts 10 minutes and allows 5 tries; a new one can be asked for after 60 seconds. A session lasts 180 days.
+- At most 10 codes a day are emailed to one address and 80 a day in total (`SIGN_IN_EMAILS_PER_DAY`; Resend's free plan sends 100 a day, shared with the other emails). Past either, the window says so and offers **Continue without an account**. Requests are also capped per network address (`LIMITS` in `server/server.js`).
+- Tries and uploads are counted in the database with a conditional update (`takeLoginAttempt`, `claimUpload` in `server/store.js`), so requests sent at the same moment cannot share one try or one free upload.
+- An address with a `+` (`ana+2@...`) is a different account with its own free uploads. The free uploads are a sales gate, as before: the file never reaches the server.
+- Each new account writes `[ACCOUNT] new account: ...` in the log and, when `LEADS_RECIPIENT` (or `ALERT_RECIPIENT`) is set on the server, sends a short email there.
+- The news checkbox is unticked by default; only accounts with `marketing_ok = true` have agreed to receive email other than their codes. To see them: `select email from accounts where marketing_ok` in Supabase.
+- Signing out removes the session and the file loaded in that browser.
+- The free questions are still counted per browser, and the cycle count tool needs no account.
+- The logic is in `server/accounts.js` (rules), `server/store.js` (database), `server/accounts.sql` (tables), `src/account.js` and `src/AccountWindows.jsx` (page). Tests: `server/accounts.test.js`, `server/store.test.js`, `src/Account.test.js`, `src/accountLogic.test.js`.
 
 ## Cycle count report
 
@@ -186,7 +237,7 @@ Four files, all built in the browser from the loaded inventory. Nothing is sent 
 
 ## Home page and privacy notice
 
-The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, accounts, analytics).
+The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, analytics). It already covers accounts, with Supabase as the provider that stores them.
 
 ## Search engines
 

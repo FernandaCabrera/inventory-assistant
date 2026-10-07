@@ -53,6 +53,22 @@ import { PAGES, pageFromPath, landingPagesIn } from "./pages";
 import { buildOrderList, runningOutFirst } from "./orderLogic";
 import { chartData } from "./reportLogic";
 import { useReportDownload, ReportCard, DashboardDownload } from "./ReportDownloads";
+import {
+  accountsWanted,
+  storedSession,
+  keepSession,
+  forgetSession,
+  fetchAccount,
+  signOut,
+  recordAnalysis,
+  clearHistory,
+  linkPlan,
+  setNews,
+  deleteAccount,
+  accountHasPlan,
+  figuresOf,
+} from "./account";
+import { SignInModal, AccountModal, SinceLast, AccountButton } from "./AccountWindows";
 import { useIsMobile, KPICard, ChartCard, chipStyle, chipButtonStyle } from "./ui";
 import CountImportModal from "./CountImportModal";
 import CycleCounts from "./CycleCounts";
@@ -675,7 +691,9 @@ function StartButtons({ t, current, onContinue, onUpload, onSample }) {
   );
 }
 
-function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue }) {
+// accounts: { wanted, active, account, onOpen }. wanted: the site is set to ask for an account
+// (decides the texts); active: the server can run them right now (decides the button).
+function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan, current, onContinue, onClear, counts, onCountUpload, onCountSample, onCountContinue, accounts }) {
   return (
     <div
       style={{
@@ -689,6 +707,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
     >
       <div style={{ position: "absolute", top: 18, right: 18, display: "flex", alignItems: "center", gap: 12 }}>
         <OtherLanguageLink lang={lang} onChange={onLang} />
+        {accounts.active && <AccountButton t={t} account={accounts.account} onClick={accounts.onOpen} style={chipButtonStyle} />}
         <LanguageToggle lang={lang} onChange={onLang} />
       </div>
 
@@ -744,7 +763,7 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
       <StartButtons t={t} current={current} onContinue={onContinue} onUpload={onUpload} onSample={onSample} />
 
       <p style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLORS.ink, letterSpacing: "0.03em", margin: "20px 0 6px" }}>
-        {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })}
+        {t(accounts.wanted ? "freeNoteAccount" : "freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })}
       </p>
       <p style={{ fontSize: 12.5, color: COLORS.inkMuted, maxWidth: 440, lineHeight: 1.55, margin: 0 }}>{t("privacy")}</p>
       {current && current.isUpload && (
@@ -771,8 +790,8 @@ function WelcomeScreen({ lang, t, onLang, onUpload, onSample, onPrivacy, onPlan,
       {/* First the main tool is explained; the cycle count report comes after it, as a second tool */}
       <HowItWorks t={t} more={PAGES.analysis[lang]} />
       <CountsIntro t={t} counts={counts} onUpload={onCountUpload} onSample={onCountSample} onContinue={onCountContinue} more={PAGES.counts[lang]} />
-      <Plans t={t} lang={lang} onPlan={onPlan} />
-      <AboutAndData t={t} onPrivacy={onPrivacy} service={PAGES.excel[lang] ? { href: PAGES.excel[lang], label: landingText("excel", lang).navLabel } : null} />
+      <Plans t={t} lang={lang} onPlan={onPlan} accounts={accounts.wanted} />
+      <AboutAndData t={t} onPrivacy={onPrivacy} accounts={accounts.wanted} service={PAGES.excel[lang] ? { href: PAGES.excel[lang], label: landingText("excel", lang).navLabel } : null} />
       <Footer t={t} onPrivacy={onPrivacy} links={pageLinks(lang, t, "home")} />
     </div>
   );
@@ -832,7 +851,20 @@ export default function InventoryAssistant({ path }) {
   const [uploadsUsed, setUploadsUsed] = useState(() => Number(load("uploadsUsed", 0)) || 0);
   const [questionsUsed, setQuestionsUsed] = useState(() => Number(load("questionsUsed", 0)) || 0);
   const [accessCode, setAccessCode] = useState(() => String(load("accessCode", "") || ""));
-  const paid = accessCode !== "";
+
+  // ---- the visitor's account (src/account.js) ----
+  // Is signing in offered? The setting (or ?cuentas=1) asks for it; the server has the last word.
+  const [wantsAccounts] = useState(accountsWanted);
+  // What the server says: "pending" until it answers, then "on" or "off"
+  const [accountsServer, setAccountsServer] = useState("pending");
+  const accountsActive = wantsAccounts && accountsServer !== "off";
+  // The key that keeps this browser signed in, and the account it opens (null until the server sends it)
+  const [session, setSession] = useState(() => (wantsAccounts ? storedSession() : ""));
+  const [account, setAccount] = useState(null);
+  const [signInFor, setSignInFor] = useState(null); // null = closed, or "upload" | "account"
+  const [showAccount, setShowAccount] = useState(false);
+  // The plan comes with a code kept in this browser or with the account that is signed in
+  const paid = accessCode !== "" || accountHasPlan(account);
 
   const [messages, setMessages] = useState([{ role: "assistant", greeting: true }]);
   const [input, setInput] = useState("");
@@ -858,6 +890,9 @@ export default function InventoryAssistant({ path }) {
   const [showCountImport, setShowCountImport] = useState(false);
   const scrollRef = useRef(null);
 
+  // the file on screen, for answers from the server that arrive after it may have changed
+  const shownDataset = useRef(dataset);
+  shownDataset.current = dataset;
   const items = useMemo(() => (dataset ? dataset.items : []), [dataset]);
   const summary = useMemo(() => summarize(items), [items]);
   const isSample = !dataset || dataset.source === "sample";
@@ -894,8 +929,47 @@ export default function InventoryAssistant({ path }) {
 
   // Wake the server as soon as the page opens: on a sleeping host the first request takes about
   // a minute, and this way it is ready by the time the visitor has loaded a file and asks something.
+  // Its answer also says whether it can run accounts.
   useEffect(() => {
-    fetch(`${API_URL}/api/health`).catch(() => {});
+    const waking = fetch(`${API_URL}/api/health`);
+    if (!wantsAccounts) {
+      waking.catch(() => {});
+      return undefined;
+    }
+    let cancelled = false;
+    waking
+      .then((res) => (res && res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setAccountsServer(data && data.accounts === true ? "on" : "off");
+      })
+      .catch(() => {
+        // the server cannot be reached at all: nobody is asked to sign in to something that is down
+        if (!cancelled) setAccountsServer("off");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Someone who signed in on an earlier visit: their account is fetched once
+  useEffect(() => {
+    if (!session) return undefined;
+    let cancelled = false;
+    fetchAccount(API_URL, session).then((result) => {
+      if (cancelled) return;
+      if (result.status === 200 && result.data.account) setAccount(result.data.account);
+      else if (result.status === 401) {
+        // the session ended or the account was deleted
+        forgetSession();
+        setSession("");
+      }
+      // anything else: the server could not answer; the key is kept for the next visit
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // A stored code is checked once per visit; a code that was withdrawn stops unlocking.
@@ -1039,21 +1113,128 @@ export default function InventoryAssistant({ path }) {
     resetConversation();
   }
 
-  function requestUpload() {
-    if (!paid && uploadsUsed >= FREE_UPLOADS) {
+  // Free uploads left: counted on the account when someone is signed in, in this browser otherwise.
+  // null = no limit (the plan).
+  function uploadsLeftFor(who, hasPlan) {
+    if (hasPlan) return null;
+    return who ? Math.max(0, who.uploadsMax - who.uploadsUsed) : Math.max(0, FREE_UPLOADS - uploadsUsed);
+  }
+  const uploadsLeft = uploadsLeftFor(account, paid);
+
+  // who: the account to count on, when it has just arrived and is not in the state yet
+  function openUpload(who = account) {
+    if (uploadsLeftFor(who, accessCode !== "" || accountHasPlan(who)) === 0) {
       setUpgradeReason("upload");
       return;
     }
     setShowImport(true);
   }
 
+  function requestUpload() {
+    // Their own file asks for an account first. A browser that already has a key goes ahead even
+    // when its account could not be fetched just now.
+    if (accountsActive && !session) {
+      setSignInFor("upload");
+      return;
+    }
+    openUpload();
+  }
+
+  // They signed in. If they were on their way to upload a file, they carry on.
+  function handleSignedIn({ token, account: signedIn }) {
+    keepSession(token);
+    setSession(token);
+    setAccount(signedIn);
+    const wasFor = signInFor;
+    setSignInFor(null);
+    // a plan bought in this browser before signing in goes with the account from now on
+    if (accessCode && signedIn.plan !== "active") {
+      linkPlan(API_URL, token, accessCode).then((result) => {
+        if (result.status === 200 && result.data.account) setAccount(result.data.account);
+      });
+    }
+    if (wasFor === "upload") openUpload(signedIn);
+    else setShowAccount(true);
+  }
+
+  // Signing in cannot work right now: the file is loaded anyway, counted in this browser.
+  function skipSignIn() {
+    setSignInFor(null);
+    setAccountsServer("off");
+    openUpload(null);
+  }
+
+  // The visitor's file is taken off the screen and out of this browser: back to the home page
+  function closeFile() {
+    remove("dataset");
+    setDataset(null);
+    setSearchQuery("");
+    resetConversation();
+    setHasEntered(false);
+    setView("assistant");
+  }
+
+  function leaveAccount() {
+    forgetSession();
+    setSession("");
+    setAccount(null);
+    setShowAccount(false);
+    // the file loaded while signed in does not stay behind in this browser
+    remove("dataset");
+    if (dataset && dataset.source === "upload") closeFile();
+  }
+
+  // The actions of the "My account" window. Each answers true when the server did it.
+  const accountActions = {
+    onNews: async (value) => {
+      const result = await setNews(API_URL, session, value);
+      if (result.status === 200 && result.data.account) setAccount(result.data.account);
+      return result.status === 200;
+    },
+    onClearHistory: async () => {
+      const result = await clearHistory(API_URL, session);
+      if (result.status === 200 && result.data.account) setAccount(result.data.account);
+      return result.status === 200;
+    },
+    onSignOut: async () => {
+      await signOut(API_URL, session); // closed here whatever the server says
+      leaveAccount();
+      return true;
+    },
+    onDelete: async () => {
+      const result = await deleteAccount(API_URL, session);
+      if (result.status === 200) leaveAccount();
+      return result.status === 200;
+    },
+  };
+
   function handleImported({ items: imported, fileName, report }) {
     const next = { items: imported, source: "upload", fileName, report, loadedAt: new Date().toISOString() };
     setDataset(next);
     save("dataset", next);
-    const used = uploadsUsed + 1;
-    setUploadsUsed(used);
-    save("uploadsUsed", used);
+    if (accountsActive && session) {
+      // Signed in: the summary of the analysis (its figures, not its products) joins the history,
+      // and the account counts the upload.
+      recordAnalysis(API_URL, session, { fileName, figures: figuresOf(imported, coverDays) }).then((result) => {
+        if (result.data.account) setAccount(result.data.account);
+        // The account had no free uploads left and this browser did not know yet (its account had
+        // not arrived when the file was chosen): the file is not kept and the plan is offered.
+        if (result.status === 402 && shownDataset.current === next) {
+          closeFile();
+          setUpgradeReason("upload");
+        }
+        if (result.status === 200 && result.data.analysisId) {
+          const recorded = { ...next, analysisId: result.data.analysisId };
+          // only if this file is still the one on screen
+          setDataset((shown) => (shown === next ? recorded : shown));
+          if (load("dataset", null)?.loadedAt === next.loadedAt) save("dataset", recorded);
+        }
+      });
+    } else {
+      const used = uploadsUsed + 1;
+      setUploadsUsed(used);
+      save("uploadsUsed", used);
+    }
     setShowImport(false);
     setSearchQuery("");
     setView("assistant");
@@ -1068,6 +1249,13 @@ export default function InventoryAssistant({ path }) {
   const closePlanWindow = useCallback(() => setPlanWindow(null), []);
   const openPrivacy = useCallback(() => setShowPrivacy(true), []);
   const closePrivacy = useCallback(() => setShowPrivacy(false), []);
+  const closeSignIn = useCallback(() => setSignInFor(null), []);
+  const closeAccount = useCallback(() => setShowAccount(false), []);
+  // The button that opens the account: the "My account" window when it is known, the sign-in window otherwise
+  const openAccount = () => {
+    if (account) setShowAccount(true);
+    else setSignInFor("account");
+  };
 
   function changeCoverDays(value) {
     setCoverDays(value);
@@ -1079,6 +1267,12 @@ export default function InventoryAssistant({ path }) {
     const clean = cleanCode(code);
     setAccessCode(clean);
     save("accessCode", clean);
+    // signed in: the code is tied to the account, so the plan opens wherever they sign in
+    if (session) {
+      linkPlan(API_URL, session, clean).then((result) => {
+        if (result.status === 200 && result.data.account) setAccount(result.data.account);
+      });
+    }
   }
 
   // Asks the server whether the PayPal subscription is active; if it is, its id is the
@@ -1090,7 +1284,8 @@ export default function InventoryAssistant({ path }) {
     try {
       const res = await fetch(`${API_URL}/api/paypal/activate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // signed in: the server ties the subscription to the account
+        headers: session ? { "Content-Type": "application/json", Authorization: `Bearer ${session}` } : { "Content-Type": "application/json" },
         body: JSON.stringify({ subscriptionId }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1291,7 +1486,7 @@ export default function InventoryAssistant({ path }) {
     try {
       const res = await fetch(`${API_URL}/api/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: session ? { "Content-Type": "application/json", Authorization: `Bearer ${session}` } : { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, inventory: items, history, code: accessCode || undefined }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1322,8 +1517,8 @@ export default function InventoryAssistant({ path }) {
         <ImportModal
           lang={lang}
           t={t}
-          uploadsLeft={paid ? null : Math.max(0, FREE_UPLOADS - uploadsUsed)}
-          uploadsMax={FREE_UPLOADS}
+          uploadsLeft={uploadsLeft}
+          uploadsMax={account ? account.uploadsMax : FREE_UPLOADS}
           onClose={closeImport}
           onImported={handleImported}
         />
@@ -1341,7 +1536,36 @@ export default function InventoryAssistant({ path }) {
           onActivated={handleActivated}
         />
       )}
-      {planWindow !== null && <PlanModal t={t} status={planWindow} code={accessCode} onRetry={confirmPayment} onClose={closePlanWindow} />}
+      {planWindow !== null && (
+        <PlanModal t={t} status={planWindow} code={accessCode || (account ? account.planCode : "")} onRetry={confirmPayment} onClose={closePlanWindow} />
+      )}
+      {signInFor !== null && (
+        <SignInModal
+          t={t}
+          lang={lang}
+          apiUrl={API_URL}
+          intent={signInFor}
+          onSignedIn={handleSignedIn}
+          onSkip={signInFor === "upload" ? skipSignIn : undefined}
+          onClose={closeSignIn}
+          onPrivacy={openPrivacy}
+        />
+      )}
+      {showAccount && account && (
+        <AccountModal
+          t={t}
+          lang={lang}
+          account={account}
+          paid={paid}
+          onPlan={() => {
+            setShowAccount(false);
+            if (paid) setPlanWindow("active");
+            else setUpgradeReason("");
+          }}
+          onClose={closeAccount}
+          {...accountActions}
+        />
+      )}
       {showPrivacy && <PrivacyModal t={t} onClose={closePrivacy} />}
     </>
   );
@@ -1447,7 +1671,7 @@ export default function InventoryAssistant({ path }) {
       actions: <StartButtons t={t} current={continueTarget()} onContinue={continueToData} onUpload={requestUpload} onSample={loadSampleData} />,
       note: (
         <p style={{ fontSize: 13, color: COLORS.inkMuted, lineHeight: 1.5, margin: "16px 0 0", maxWidth: 720 }}>
-          {t("freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}
+          {t(wantsAccounts ? "freeNoteAccount" : "freeNote", { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS })} {t("privacy")}
         </p>
       ),
     };
@@ -1492,6 +1716,7 @@ export default function InventoryAssistant({ path }) {
           onCountUpload={openCountImport}
           onCountSample={loadSampleCounts}
           onCountContinue={showCountReport}
+          accounts={{ wanted: wantsAccounts, active: accountsActive, account, onOpen: openAccount }}
         />
         {modals}
       </>
@@ -1615,6 +1840,7 @@ export default function InventoryAssistant({ path }) {
               {t("planFree")}
             </button>
           )}
+          {accountsActive && <AccountButton t={t} account={account} onClick={openAccount} style={chipButtonStyle} />}
           <button onClick={requestUpload} style={{ ...chipButtonStyle, background: COLORS.ink, color: "#F4F1EA" }}>
             <Upload size={11} /> {isSample ? t("uploadExcel") : t("replaceData")}
           </button>
@@ -1736,6 +1962,9 @@ export default function InventoryAssistant({ path }) {
             onOpenOrders={() => setView("orders")}
             onOpenDashboard={() => setView("dashboard")}
           />
+          {account && dataset && dataset.source === "upload" && dataset.analysisId && (
+            <SinceLast t={t} lang={lang} account={account} analysisId={dataset.analysisId} onHistory={() => setShowAccount(true)} />
+          )}
           <ReportCard t={t} state={reportDownload} locked={dashboardLocked} isSample={isSample} />
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 320px", gap: 20 }}>
             {/* Chat panel */}

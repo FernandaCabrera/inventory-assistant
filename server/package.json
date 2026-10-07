@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test paypal.test.js"
+    "test": "node --test paypal.test.js store.test.js accounts.test.js"
   },
   "keywords": [],
   "author": "",
