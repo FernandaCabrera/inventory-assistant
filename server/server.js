@@ -6,7 +6,10 @@ const { Resend } = require("resend");
 const cron = require("node-cron");
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 const { createPaypalPlan, isSubscriptionId } = require("./paypal");
+const { createAccounts, cleanEmail } = require("./accounts");
+const { memoryStore, supabaseStore } = require("./store");
 
 const app = express();
 
@@ -60,6 +63,25 @@ const paypalPlan = createPaypalPlan({
   apiBase: process.env.PAYPAL_API_BASE || undefined, // only for tests
 });
 
+// The visitor's network address, which the limits "per address" count by. Behind the host's proxy
+// it comes from the X-Forwarded-For header, and on some hosts a visitor can write that header
+// themselves and so look like someone new on every request. CLIENT_IP_HEADER names a header that
+// the host sets and a visitor cannot (on Render, which sits behind Cloudflare: cf-connecting-ip).
+// When it is not set, or a request comes without it, the address is the one Express works out.
+const CLIENT_IP_HEADER = (process.env.CLIENT_IP_HEADER || "").trim().toLowerCase();
+let saidHeaderMissing = false;
+function clientIp(req) {
+  if (CLIENT_IP_HEADER) {
+    const value = String(req.get(CLIENT_IP_HEADER) || "").trim();
+    if (net.isIP(value)) return value;
+    if (!saidHeaderMissing) {
+      saidHeaderMissing = true;
+      console.warn(`[LIMITS] A request came without the header ${CLIENT_IP_HEADER} (CLIENT_IP_HEADER): its address was taken from X-Forwarded-For instead.`);
+    }
+  }
+  return req.ip || "unknown";
+}
+
 function intEnv(name, fallback) {
   const n = parseInt(process.env[name], 10);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
@@ -74,6 +96,17 @@ const LIMITS = {
   global: intEnv("GLOBAL_DAILY_QUESTIONS", 200),
   codeFailuresPerIp: 20,
   requestsPerIp: 5,
+  // signing in: requests for a code per day from one address, and codes typed per day from one
+  signInsPerIp: 30,
+  codeTriesPerIp: 60,
+  // codes emailed per day to one address. With 5 tries per code this is also what bounds guessing
+  // someone's code, whatever network address the guesses come from.
+  signInsPerEmail: 10,
+  // codes emailed per day in total, so that nobody can use up the day's allowance of the mail
+  // service (100 a day on Resend's free plan) and leave nothing for the other emails
+  signInEmailsPerDay: intEnv("SIGN_IN_EMAILS_PER_DAY", 80),
+  // files recorded per day by one account
+  analysesPerAccount: 300,
 };
 
 // SKUs sent to the AI per question. Larger inventories send the most urgent ones first.
@@ -102,6 +135,12 @@ function take(key, max) {
   return true;
 }
 
+// Undo a take() that turned out not to be used
+function giveBack(key) {
+  const current = used(key);
+  if (current > 0) counters.counts.set(key, current - 1);
+}
+
 // Is this code a paid plan? "active" | "inactive" | "unknown" (a PayPal code that could not be
 // checked right now). An address that has sent too many wrong codes today gets no more questions
 // to PayPal, only what is already known, so made-up codes cannot be used to flood PayPal.
@@ -110,6 +149,145 @@ async function planStatus(code, ip) {
   if (ACCESS_CODES.has(code)) return "active";
   const tooManyWrongCodes = used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp;
   return paypalPlan.check(code, { cacheOnly: tooManyWrongCodes });
+}
+
+// ---- ACCOUNTS ----
+// Visitors sign in with their email and a 6-digit code (accounts.js). Off until the server has a
+// database (SUPABASE_URL and SUPABASE_SECRET_KEY, with the tables of accounts.sql) and an address
+// it may send email from (AUTH_SENDER, on a domain verified in Resend). While it is off the page
+// works as before: no sign-in, and the free uploads are counted in the browser.
+//
+// ACCOUNTS_DEV=true is for trying accounts on your own computer without either: accounts are kept
+// in memory and the codes are written to this log instead of emailed. Never set it on a live server.
+const AUTH_SENDER = (process.env.AUTH_SENDER || "").trim();
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SUPABASE_KEY = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+const hasDatabase = SUPABASE_URL !== "" && SUPABASE_KEY !== "";
+const canEmailCodes = Boolean(process.env.RESEND_API_KEY) && AUTH_SENDER !== "";
+const ACCOUNTS_DEV = process.env.ACCOUNTS_DEV === "true" && !hasDatabase;
+
+function signInEmail(code, lang) {
+  const es = lang === "es";
+  const lines = es
+    ? { subject: `Tu código de MiKardex: ${code}`, lead: "Tu código para entrar a MiKardex es:", note: "Vence en 10 minutos. Si no lo pediste, ignora este correo: nadie puede entrar sin él." }
+    : { subject: `Your MiKardex code: ${code}`, lead: "Your code to sign in to MiKardex is:", note: "It expires in 10 minutes. If you did not ask for it, ignore this email: nobody can sign in without it." };
+  return {
+    subject: lines.subject,
+    text: `${lines.lead} ${code}\n\n${lines.note}\n\nMiKardex · mikardex.cl`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#15181A;">
+        <div style="background:#15181A;color:#F4F1EA;padding:14px 20px;border-radius:10px 10px 0 0;font-size:13px;letter-spacing:2px;">MIKARDEX</div>
+        <div style="border:1px solid #DADFD7;border-top:none;border-radius:0 0 10px 10px;padding:20px;">
+          <p style="margin:0 0 12px;font-size:15px;">${lines.lead}</p>
+          <p style="margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:6px;font-family:monospace;">${code}</p>
+          <p style="margin:0;font-size:13px;color:#6B7268;line-height:1.5;">${lines.note}</p>
+        </div>
+      </div>`,
+  };
+}
+
+async function sendSignInCode({ email, code, lang }) {
+  if (!canEmailCodes) {
+    console.log(`[ACCOUNTS DEV] sign-in code for ${email}: ${code}`);
+    return;
+  }
+  const { error } = await resend.emails.send({ from: AUTH_SENDER, to: email, ...signInEmail(code, lang) });
+  if (error) throw new Error(error.message || "Resend did not accept the email");
+}
+
+// A new account is a new lead: the owner gets an email about it. The log line is the backup copy.
+// A visitor's address is only ever emailed to a recipient set on purpose (LEADS_RECIPIENT or
+// ALERT_RECIPIENT), never to the address written in this file as a fallback.
+const ACCOUNT_NOTICE_TO = (process.env.LEADS_RECIPIENT || process.env.ALERT_RECIPIENT || "").trim();
+async function tellOwnerAboutAccount(account) {
+  console.log(`[ACCOUNT] new account: ${account.email} | lang=${account.lang} | news=${account.marketingOk ? "yes" : "no"}`);
+  if (!canEmailCodes || !ACCOUNT_NOTICE_TO) return;
+  const { error } = await resend.emails.send({
+    from: AUTH_SENDER,
+    to: ACCOUNT_NOTICE_TO,
+    replyTo: account.email,
+    subject: `MiKardex: new account ${account.email}`,
+    text:
+      `${account.email} opened an account to upload their own file.\n` +
+      `Language: ${account.lang === "es" ? "Spanish" : "English"}\n` +
+      `Wants tips and news by email: ${account.marketingOk ? "yes" : "no"}\n\n` +
+      "Reply to this email to write to them directly.",
+  });
+  if (error) throw new Error(error.message || "Resend did not accept the email");
+}
+
+const accounts = createAccounts({
+  store: hasDatabase ? supabaseStore({ url: SUPABASE_URL, key: SUPABASE_KEY }) : ACCOUNTS_DEV ? memoryStore() : null,
+  sendCode: canEmailCodes || ACCOUNTS_DEV ? sendSignInCode : null,
+  onNewAccount: tellOwnerAboutAccount,
+  freeUploads: intEnv("FREE_UPLOADS", 3),
+});
+
+// The key a signed-in browser sends: "Authorization: Bearer <key>"
+function sessionKey(req) {
+  const match = /^Bearer\s+(\S+)$/i.exec(req.get("authorization") || "");
+  return match ? match[1] : "";
+}
+
+// What the page gets to know about an account
+async function accountView(account, ip) {
+  const plan = account.planCode ? await planStatus(normalizeCode(account.planCode), ip) : "inactive";
+  return {
+    email: account.email,
+    createdAt: account.createdAt,
+    marketingOk: account.marketingOk,
+    plan, // "active" | "inactive" | "unknown" (PayPal could not be asked right now)
+    planCode: account.planCode,
+    uploadsUsed: account.uploadsUsed,
+    uploadsMax: accounts.freeUploads,
+    analyses: await accounts.history(account),
+  };
+}
+
+// The same without asking anyone anything, for when the rest could not be fetched just now
+function accountBasics(account) {
+  return {
+    email: account.email,
+    createdAt: account.createdAt,
+    marketingOk: account.marketingOk,
+    plan: account.planCode ? "unknown" : "inactive",
+    planCode: account.planCode,
+    uploadsUsed: account.uploadsUsed,
+    uploadsMax: accounts.freeUploads,
+    analyses: [],
+  };
+}
+
+// The database may be down or asleep: the page is told "unavailable" and carries on without the
+// account, instead of getting an error it cannot explain.
+function withAccounts(handler) {
+  return async (req, res) => {
+    if (!accounts.enabled) return res.status(503).json({ error: "disabled" });
+    try {
+      await handler(req, res);
+    } catch (error) {
+      console.error("[ACCOUNTS]", error && error.message);
+      if (!res.headersSent) res.status(503).json({ error: "unavailable" });
+    }
+  };
+}
+
+// For the routes that need someone signed in: answers 401 itself when nobody is
+function withAccount(handler) {
+  return withAccounts(async (req, res) => {
+    const account = await accounts.authenticate(sessionKey(req));
+    if (!account) return res.status(401).json({ error: "signed_out" });
+    return handler(req, res, account);
+  });
+}
+
+// Supabase pauses a free database after a week without use. Visits to the page call /api/health,
+// so the database is asked something small from there, at most once an hour.
+let lastDatabasePing = 0;
+function keepDatabaseAwake() {
+  if (!accounts.enabled || Date.now() - lastDatabasePing < 60 * 60 * 1000) return;
+  lastDatabasePing = Date.now();
+  accounts.ping().catch((error) => console.error("[ACCOUNTS] The database could not be reached:", error && error.message));
 }
 
 const SYSTEM_PROMPT = `You are a senior inventory planning analyst advising the owner or operations manager of a small or
@@ -293,8 +471,17 @@ app.post("/api/ask", async (req, res) => {
     return res.status(400).json({ error: "bad_request" });
   }
 
-  const ip = req.ip || "unknown";
-  const code = normalizeCode(body.code);
+  const ip = clientIp(req);
+  let code = normalizeCode(body.code);
+  // No code in this browser: the plan may be on the account that is signed in
+  if (!code && accounts.enabled && sessionKey(req)) {
+    try {
+      const account = await accounts.authenticate(sessionKey(req));
+      if (account) code = normalizeCode(account.planCode);
+    } catch (error) {
+      console.error("[ACCOUNTS]", error && error.message); // the question goes ahead on the free limits
+    }
+  }
   const plan = await planStatus(code, ip);
   const hasPlan = plan === "active";
   // a PayPal code that is not a live subscription counts as a wrong code for this address
@@ -366,10 +553,149 @@ app.post("/api/ask", async (req, res) => {
 });
 
 // The page calls this when it opens, so a sleeping server is awake by the time the visitor asks something.
-// It also says whether PayPal is set up, so the page only offers to pay when a payment can be confirmed.
+// It also says whether PayPal is set up, so the page only offers to pay when a payment can be confirmed,
+// and whether accounts are, so the page only asks to sign in when signing in can work.
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, paypal: paypalPlan.enabled });
+  keepDatabaseAwake();
+  res.json({ ok: true, paypal: paypalPlan.enabled, accounts: accounts.enabled });
 });
+
+// ---- SIGNING IN ----
+
+// Step 1: the visitor typed their email; a code is emailed to them.
+app.post(
+  "/api/auth/start",
+  withAccounts(async (req, res) => {
+    const ip = clientIp(req);
+    const body = req.body || {};
+    const email = cleanEmail(body.email);
+    if (!email) return res.status(400).json({ error: "email" });
+    if (!take(`signin:${ip}`, LIMITS.signInsPerIp)) return res.status(429).json({ error: "limit" });
+    // The allowances of the email and of the day are for codes that were really emailed: they are
+    // held while the code is sent and given back when none went out ("wait a minute", an error).
+    const perEmail = `signinmail:${email}`;
+    if (!take(perEmail, LIMITS.signInsPerEmail)) return res.status(429).json({ error: "limit" });
+    if (!take("signinmail:all", LIMITS.signInEmailsPerDay)) {
+      giveBack(perEmail);
+      // said once a day
+      if (take("signinmail:said", 1)) console.error(`[ACCOUNTS] ${LIMITS.signInEmailsPerDay} sign-in codes were emailed today (SIGN_IN_EMAILS_PER_DAY): no more until 00:00 UTC. Visitors can still upload without an account.`);
+      return res.status(503).json({ error: "unavailable" });
+    }
+    let sent = false;
+    try {
+      const result = await accounts.start(email, { lang: body.lang });
+      sent = result.ok;
+      if (result.ok) return res.json({ ok: true });
+      if (result.error === "wait") return res.status(429).json({ error: "wait", seconds: result.seconds });
+      if (result.error === "email") return res.status(400).json({ error: "email" });
+      return res.status(503).json({ error: "unavailable" });
+    } finally {
+      if (!sent) {
+        giveBack(perEmail);
+        giveBack("signinmail:all");
+      }
+    }
+  })
+);
+
+// Step 2: they typed the code. The answer carries the key the browser keeps to stay signed in.
+app.post(
+  "/api/auth/verify",
+  withAccounts(async (req, res) => {
+    const ip = clientIp(req);
+    const body = req.body || {};
+    if (!take(`codetry:${ip}`, LIMITS.codeTriesPerIp)) return res.status(429).json({ error: "limit" });
+    const result = await accounts.verify(body.email, body.code, { lang: body.lang, marketingOk: body.marketingOk === true });
+    if (!result.ok) return res.status(400).json({ error: result.error, left: result.left });
+    // The code is used up by now: the key is handed over even if the history cannot be read just
+    // now, or the visitor would be left with a spent code and no way in.
+    let account;
+    try {
+      account = await accountView(result.account, ip);
+    } catch (error) {
+      console.error("[ACCOUNTS] Signed in, but the rest of the account could not be read:", error && error.message);
+      account = accountBasics(result.account);
+    }
+    res.json({ ok: true, token: result.token, created: result.created, account });
+  })
+);
+
+app.post(
+  "/api/auth/signout",
+  withAccounts(async (req, res) => {
+    await accounts.signOut(sessionKey(req));
+    res.json({ ok: true });
+  })
+);
+
+// ---- THE ACCOUNT ----
+
+app.get(
+  "/api/me",
+  withAccount(async (req, res, account) => {
+    res.json({ account: await accountView(account, clientIp(req)) });
+  })
+);
+
+// What the visitor can change: whether they want tips and news by email
+app.patch(
+  "/api/account",
+  withAccount(async (req, res, account) => {
+    const body = req.body || {};
+    const updated = typeof body.marketingOk === "boolean" ? await accounts.setMarketing(account, body.marketingOk) : account;
+    res.json({ account: await accountView(updated || account, clientIp(req)) });
+  })
+);
+
+app.delete(
+  "/api/account",
+  withAccount(async (req, res, account) => {
+    await accounts.remove(account);
+    console.log("[ACCOUNT] an account was deleted by its owner");
+    res.json({ ok: true });
+  })
+);
+
+// A code the visitor already has (a PayPal subscription or one handed out) is tied to the account,
+// so the plan follows them to any browser they sign in on.
+app.post(
+  "/api/account/plan",
+  withAccount(async (req, res, account) => {
+    const ip = clientIp(req);
+    if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) return res.status(429).json({ valid: false, error: "limit" });
+    const code = normalizeCode(req.body && req.body.code);
+    const status = await planStatus(code, ip);
+    if (status === "unknown") return res.status(503).json({ error: "unavailable" });
+    if (status !== "active") {
+      take(`codefail:${ip}`, LIMITS.codeFailuresPerIp);
+      return res.json({ valid: false });
+    }
+    const updated = await accounts.setPlanCode(account, code);
+    res.json({ valid: true, account: await accountView(updated || account, ip) });
+  })
+);
+
+// A file was analyzed in the browser: its figures (not its products) join the account's history.
+app.post(
+  "/api/analyses",
+  withAccount(async (req, res, account) => {
+    const ip = clientIp(req);
+    const body = req.body || {};
+    if (!take(`analyses:${account.id}`, LIMITS.analysesPerAccount)) return res.status(429).json({ error: "limit" });
+    const paid = account.planCode !== "" && (await planStatus(normalizeCode(account.planCode), ip)) === "active";
+    const result = await accounts.recordAnalysis(account, { fileName: body.fileName, figures: body.figures }, { paid });
+    if (!result.ok) return res.status(402).json({ error: "limit", account: await accountView(account, ip) });
+    res.json({ ok: true, analysisId: result.analysis.id, account: await accountView(result.account, ip) });
+  })
+);
+
+app.delete(
+  "/api/analyses",
+  withAccount(async (req, res, account) => {
+    await accounts.clearHistory(account);
+    res.json({ ok: true, account: await accountView(account, clientIp(req)) });
+  })
+);
 
 // The AI's instructions are private by default. Set EXPOSE_SYSTEM_PROMPT=true (together with
 // SHOW_PROMPT in src/config.js) to show them in the app, e.g. for a demo.
@@ -381,7 +707,7 @@ app.get("/api/system-prompt", (req, res) => {
 // ---- ACCESS CODES ----
 
 app.post("/api/validate-code", async (req, res) => {
-  const ip = req.ip || "unknown";
+  const ip = clientIp(req);
   if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) {
     return res.status(429).json({ valid: false, error: "limit" });
   }
@@ -399,7 +725,7 @@ app.post("/api/validate-code", async (req, res) => {
 // The visitor has just subscribed with the PayPal button: the page sends the subscription id and,
 // once PayPal confirms it is active, gets it back as the access code.
 app.post("/api/paypal/activate", async (req, res) => {
-  const ip = req.ip || "unknown";
+  const ip = clientIp(req);
   if (used(`codefail:${ip}`) >= LIMITS.codeFailuresPerIp) {
     return res.status(429).json({ valid: false, error: "limit" });
   }
@@ -409,7 +735,17 @@ app.post("/api/paypal/activate", async (req, res) => {
   if (result.ok) {
     // the code opens the plan, so only its last characters go in the log (enough to find it in PayPal)
     console.log(`[PLAN] PayPal subscription activated: I-...${result.code.slice(-5)}`);
-    return res.json({ valid: true, code: result.code });
+    // Whoever pays while signed in has the plan on their account from now on
+    let linked = false;
+    if (accounts.enabled && sessionKey(req)) {
+      try {
+        const account = await accounts.authenticate(sessionKey(req));
+        if (account) linked = Boolean(await accounts.setPlanCode(account, result.code));
+      } catch (error) {
+        console.error("[ACCOUNTS] The subscription could not be tied to the account:", error && error.message);
+      }
+    }
+    return res.json({ valid: true, code: result.code, linked });
   }
   // could not be confirmed right now: the page keeps the subscription id and tries again
   if (result.error === "unavailable" || result.error === "disabled" || result.error === "pending") {
@@ -451,7 +787,7 @@ app.post("/api/upgrade-request", async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ ok: false, error: "email" });
   }
-  const ip = req.ip || "unknown";
+  const ip = clientIp(req);
   if (!take(`request:${ip}`, LIMITS.requestsPerIp)) {
     return res.status(429).json({ ok: false, error: "limit" });
   }
@@ -577,7 +913,7 @@ async function checkInventoryAndAlert(triggeredManually = false) {
 
 // Manual trigger endpoint — lets you test without waiting for the cron schedule
 app.post("/api/send-alert", async (req, res) => {
-  if (!take(`alert:${req.ip || "unknown"}`, 10)) {
+  if (!take(`alert:${clientIp(req)}`, 10)) {
     return res.status(429).json({ sent: false, reason: "Daily limit for manual alerts reached." });
   }
   const result = await checkInventoryAndAlert(true);
@@ -611,6 +947,23 @@ console.log(
   paypalPlan.enabled
     ? `PayPal: on (${process.env.PAYPAL_ENV === "sandbox" ? "sandbox" : "live"})${process.env.PAYPAL_PLAN_ID ? `, only for plan ${process.env.PAYPAL_PLAN_ID}` : ""}.`
     : "PayPal: off (set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET to accept subscriptions)."
+);
+
+if (accounts.enabled) {
+  console.log(`Accounts: on (${hasDatabase ? "Supabase" : "kept in memory, codes written to this log: only for trying it out"}). Free uploads per account: ${accounts.freeUploads}.`);
+  // said once at start, so a wrong key or missing tables show up in the log and not with the first visitor
+  accounts
+    .ping()
+    .then(() => console.log("Accounts: the database answered."))
+    .catch((error) => console.error(`Accounts: the database could NOT be reached. Check SUPABASE_URL and SUPABASE_SECRET_KEY, and that accounts.sql was run. (${error && error.message})`));
+} else {
+  const missing = [!hasDatabase && "SUPABASE_URL and SUPABASE_SECRET_KEY", !canEmailCodes && "AUTH_SENDER (and RESEND_API_KEY)"].filter(Boolean).join(", ");
+  console.log(`Accounts: off (set ${missing} to let visitors sign in).`);
+}
+console.log(
+  CLIENT_IP_HEADER
+    ? `Limits per address: counted by the header ${CLIENT_IP_HEADER}.`
+    : "Limits per address: counted by X-Forwarded-For. If the host lets visitors write that header, set CLIENT_IP_HEADER (on Render: cf-connecting-ip)."
 );
 
 const PORT = 4001;

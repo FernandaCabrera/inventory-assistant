@@ -54,7 +54,8 @@ export function HowItWorks({ t, more }) {
 }
 
 // What is free and what the plan adds, with the price, before anyone has to hit a limit to find out
-export function Plans({ t, lang, onPlan }) {
+// accounts: the site asks for an account to upload a file, so the free trial comes with a history
+export function Plans({ t, lang, onPlan, accounts = false }) {
   const price = PLAN_PRICE[lang] || "";
   const vars = { uploads: countText(t, "uploads", FREE_UPLOADS), questions: FREE_QUESTIONS, rows: ORDER_FREE_ROWS };
   const list = { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 };
@@ -69,7 +70,7 @@ export function Plans({ t, lang, onPlan }) {
           <div style={name}>{t("plansFree")}</div>
           <div style={amount}>{t("plansFreePrice")}</div>
           <ul style={list}>
-            {t("freeItems").map((text, i) => (
+            {[...t("freeItems"), ...(accounts ? [t("freeItemHistory")] : [])].map((text, i) => (
               <li key={i} style={item}>
                 <Check size={16} color={COLORS.inkMuted} style={{ flexShrink: 0, marginTop: 3 }} />
                 {fill(text, vars)}
@@ -99,7 +100,8 @@ export function Plans({ t, lang, onPlan }) {
 }
 
 // service: the page about the Excel automation service, as { href, label }, when it exists in this language
-export function AboutAndData({ t, onPrivacy, service }) {
+// accounts: the site asks for an account to upload a file, so what an account keeps is said here too
+export function AboutAndData({ t, onPrivacy, service, accounts = false }) {
   return (
     <section style={{ ...wrap, display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 36 }}>
       <div style={{ ...box, flex: "1 1 340px" }}>
@@ -123,7 +125,7 @@ export function AboutAndData({ t, onPrivacy, service }) {
       <div style={{ ...box, flex: "1 1 340px" }}>
         <h2 style={{ ...sectionTitle, fontSize: 22, marginBottom: 12 }}>{t("dataTitle")}</h2>
         <ul style={{ listStyle: "none", padding: 0, margin: "0 0 14px", display: "flex", flexDirection: "column", gap: 9 }}>
-          {t("dataPoints").map((point, i) => (
+          {[...t("dataPoints"), ...(accounts ? [t("dataPointAccount")] : [])].map((point, i) => (
             <li key={i} style={{ display: "flex", gap: 9, fontSize: 14, color: COLORS.ink, lineHeight: 1.55 }}>
               <ShieldCheck size={16} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 3 }} />
               {point}
