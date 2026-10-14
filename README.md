@@ -239,6 +239,13 @@ Four files, all built in the browser from the loaded inventory. Nothing is sent 
 
 The home page explains how the tool works, who is behind it and what happens to the data, and links to a privacy notice. The texts live in `src/i18n.js` (`aboutBody`, `dataPoints`, `privacySections`), in both languages. The privacy notice describes what the code does today; update it whenever that changes (new providers, analytics). It already covers accounts, with Supabase as the provider that stores them.
 
+## Visit counts
+
+- **What** — Vercel Web Analytics counts visits on every page: the page seen, the site the visitor came from, the country and the type of device and browser. No cookies and nothing that identifies a person; it never sees the files. The privacy notice says so (`privacySections` in `src/i18n.js`).
+- **How** — a script tag in `public/index.html`, so every page the build writes carries it. It is not the `@vercel/analytics` npm package: that package lists optional peer dependencies that npm cannot reconcile with `react-scripts`, which would break `npm install` on Vercel. For a page like this one the two count the same.
+- **To turn it on** — in Vercel, open the project → **Analytics** → **Enable**. Until it is enabled the script is not found and the browser console shows one error; nothing else changes. The figures appear under Analytics after a few days of visits.
+- **Old addresses** — `vercel.json` sends `/caso-estudio.html`, a page of the old landing that Google still had, to the home page with a permanent redirect.
+
 ## Search engines
 
 What Google needs to find the page, read it and show it in the right language.

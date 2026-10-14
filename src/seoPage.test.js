@@ -192,3 +192,10 @@ test("public/index.html and robots.txt use the official address", () => {
   expect(index).toContain(`<link rel="canonical" href="${SITE_URL}/" />`);
   expect(publicFile("robots.txt")).toContain(`Sitemap: ${SITE_URL}/sitemap.xml`);
 });
+
+test("every page counts visits, and the old case study page sends people home", () => {
+  // the template of every page, so each written page carries the counter
+  expect(template).toContain('<script defer src="/_vercel/insights/script.js"></script>');
+  const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "vercel.json"), "utf8"));
+  expect(vercel.redirects).toContainEqual({ source: "/caso-estudio.html", destination: "/", permanent: true });
+});
