@@ -60,7 +60,9 @@ test("the address decides the page", () => {
   }
   expect(pageFromPath("/automatizacion-excel/")).toEqual({ id: "excel", lang: "es" });
   expect(pageFromPath("/en/excel-automation/")).toEqual({ id: "excel", lang: "en" });
-  expect(landingPagesIn("es")).toEqual(["counts", "analysis", "excel"]);
+  expect(pageFromPath("/punto-de-reorden-excel/")).toEqual({ id: "reorder", lang: "es" });
+  expect(pageFromPath("/kardex-excel/")).toEqual({ id: "kardex", lang: "es" });
+  expect(landingPagesIn("es")).toEqual(["counts", "analysis", "excel", "reorder", "kardex"]);
   expect(landingPagesIn("en")).toEqual(["counts", "excel"]);
 });
 
