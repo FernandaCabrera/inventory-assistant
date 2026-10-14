@@ -294,7 +294,7 @@ const STRINGS = {
     privacyLink: "Privacy notice",
     footerContact: "Contact",
     privacyTitle: "Privacy notice",
-    privacyUpdated: "Last updated: October 7, 2026",
+    privacyUpdated: "Last updated: October 14, 2026",
     privacySections: [
       { h: "Who is responsible", p: ["MiKardex is operated by {name}. Contact: {email}."] },
       {
@@ -307,12 +307,13 @@ const STRINGS = {
           "Payments: if you subscribe, you pay with PayPal. PayPal receives your payment details; we never see or store your card number. Through PayPal we can see your name, your email and the status of your subscription, to manage it and to contact you about it. The identifier of your subscription is saved in your browser as your access code and is sent to our server to check that the subscription is still active. PayPal's button is loaded from PayPal when you open the plan window, and PayPal may use its own cookies.",
           "Your account: to upload your own file the page may ask you to sign in with your email. If you do, we keep your email, the date the account was opened, the state of your plan, how many files you have analyzed, whether you agreed to receive news, and the summary of each analysis: its date, the name of the file and its key figures (number of products, how many are critical, low, without sales or in excess, availability, inventory value, capital tied up and recommended purchase). The products of your inventory are not stored on our servers. To sign in we email you a code, and your browser keeps a key that holds the session open; of both we store only a fingerprint, which cannot be read back.",
           "Technical records: the server notes, without any content, how many questions are asked and how many products they carry, to control usage. Our hosting providers may record technical data such as the IP address.",
+          "Visit counts: to know how many people visit the site and how they found it, the page counts visits with Vercel Web Analytics. It records the page seen, the site the visitor came from, the country and the type of device and browser, without cookies and without identifying anyone. It never sees the content of your files.",
         ],
       },
       { h: "What it is used for", p: ["To give you the analysis you ask for, to give you access to your account and its history if you have one, to manage your subscription and, if you request it, to contact you about the plan. We send you tips and news only if you ticked that box, and you can untick it in \"My account\". We do not sell your data or use it for advertising."] },
       {
         h: "Providers",
-        p: ["Vercel (hosts the page), Render (hosts the server), Anthropic (AI model), PayPal (payments), Supabase (the database of accounts), Resend (sends email) and Google Fonts (typefaces). Each one handles data under its own terms."],
+        p: ["Vercel (hosts the page and counts visits), Render (hosts the server), Anthropic (AI model), PayPal (payments), Supabase (the database of accounts), Resend (sends email) and Google Fonts (typefaces). Each one handles data under its own terms."],
       },
       { h: "A recommendation", p: ["Do not include personal data about your customers in the file. The tool does not need it."] },
       {
@@ -1164,7 +1165,7 @@ const STRINGS = {
     privacyLink: "Aviso de privacidad",
     footerContact: "Contacto",
     privacyTitle: "Aviso de privacidad",
-    privacyUpdated: "Última actualización: 7 de octubre de 2026",
+    privacyUpdated: "Última actualización: 14 de octubre de 2026",
     privacySections: [
       { h: "Quién es responsable", p: ["MiKardex es operado por {name}. Contacto: {email}."] },
       {
@@ -1177,12 +1178,13 @@ const STRINGS = {
           "Pagos: si te suscribes, pagas con PayPal. PayPal recibe tus datos de pago; nosotros nunca vemos ni guardamos el número de tu tarjeta. A través de PayPal podemos ver tu nombre, tu correo y el estado de tu suscripción, para administrarla y contactarte por ella. El identificador de tu suscripción queda guardado en tu navegador como tu código de acceso y se envía a nuestro servidor para comprobar que la suscripción sigue activa. El botón de PayPal se carga desde PayPal cuando abres la ventana del plan, y PayPal puede usar sus propias cookies.",
           "Tu cuenta: para subir tu propio archivo la página puede pedirte que entres con tu correo. Si lo haces, guardamos tu correo, la fecha en que creaste la cuenta, el estado de tu plan, cuántos archivos has analizado, si aceptaste recibir novedades y el resumen de cada análisis: la fecha, el nombre del archivo y sus indicadores (cantidad de productos, cuántos están críticos, bajos, sin ventas o con exceso, disponibilidad, valor del inventario, capital detenido y compra recomendada). Los productos de tu inventario no se guardan en nuestros servidores. Para entrar te enviamos un código por correo, y tu navegador guarda una llave para mantener la sesión abierta; de ambos guardamos solo una huella, que no permite leerlos.",
           "Registros técnicos: el servidor anota, sin contenido, cuántas preguntas se hacen y cuántos productos traen, para controlar el uso. Nuestros proveedores de alojamiento pueden registrar datos técnicos como la dirección IP.",
+          "Conteo de visitas: para saber cuántas personas visitan el sitio y cómo llegaron, la página cuenta las visitas con Vercel Web Analytics. Registra la página vista, el sitio desde el que llegó la visita, el país y el tipo de dispositivo y navegador, sin cookies y sin identificar a nadie. Nunca ve el contenido de tus archivos.",
         ],
       },
       { h: "Para qué se usan", p: ["Para darte el análisis que pides, darte acceso a tu cuenta y a su historial si tienes una, administrar tu suscripción y, si lo solicitas, contactarte por el plan. Te enviamos consejos y novedades solo si marcaste esa casilla, y puedes desmarcarla en “Mi cuenta”. No vendemos tus datos ni los usamos para publicidad."] },
       {
         h: "Proveedores",
-        p: ["Vercel (aloja la página), Render (aloja el servidor), Anthropic (modelo de IA), PayPal (pagos), Supabase (base de datos de las cuentas), Resend (envío de correos) y Google Fonts (tipografías). Cada uno trata los datos según sus propias condiciones."],
+        p: ["Vercel (aloja la página y cuenta las visitas), Render (aloja el servidor), Anthropic (modelo de IA), PayPal (pagos), Supabase (base de datos de las cuentas), Resend (envío de correos) y Google Fonts (tipografías). Cada uno trata los datos según sus propias condiciones."],
       },
       { h: "Una recomendación", p: ["No incluyas datos personales de tus clientes en el archivo. La herramienta no los necesita."] },
       {

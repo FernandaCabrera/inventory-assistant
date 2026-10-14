@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/caso-estudio.html",
+      "destination": "/",
+      "permanent": true
+    }
+  ]
+}
