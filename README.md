@@ -242,8 +242,8 @@ The home page explains how the tool works, who is behind it and what happens to 
 ## Visit counts
 
 - **What** — Vercel Web Analytics counts visits on every page: the page seen, the site the visitor came from, the country and the type of device and browser. No cookies and nothing that identifies a person; it never sees the files. The privacy notice says so (`privacySections` in `src/i18n.js`).
-- **How** — a script tag in `public/index.html`, so every page the build writes carries it. It is not the `@vercel/analytics` npm package: that package lists optional peer dependencies that npm cannot reconcile with `react-scripts`, which would break `npm install` on Vercel. For a page like this one the two count the same.
-- **To turn it on** — in Vercel, open the project → **Analytics** → **Enable**. Until it is enabled the script is not found and the browser console shows one error; nothing else changes. The figures appear under Analytics after a few days of visits.
+- **How** — `src/visits.js`, called from `src/index.js`, adds Vercel's counter script to every page, the same way the `@vercel/analytics` package does. Vercel gives each project its own address for the counter and hands it to the build as `REACT_APP_VERCEL_OBSERVABILITY_BASEPATH`; with no address (on a computer, in tests) nothing is loaded. It is not the npm package itself because that package lists optional peer dependencies that npm cannot reconcile with `react-scripts`, which would break `npm install` on Vercel.
+- **To turn it on** — in Vercel, open the project → **Analytics** → **Enable**, then publish again (a merge, or Deployments → ⋯ → Redeploy): the address only reaches builds made after enabling. To check it works, open the site and look at Analytics: "online" shows 1. The figures appear after a few days of visits.
 - **Old addresses** — `vercel.json` sends `/caso-estudio.html`, a page of the old landing that Google still had, to the home page with a permanent redirect.
 
 ## Search engines
